@@ -1,0 +1,280 @@
+/* indigokarasu.com :: handcrafted, no bootstrap, no bullshit */
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --text: #e0e0e8;
+  --text-muted: #888899;
+  --accent: #7b61ff;
+  --accent-dim: #4a3d8f;
+  --border: #1e1e2e;
+  --max-width: 720px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; scroll-behavior: smooth; }
+
+body {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* header */
+.site-header {
+  border-bottom: 1px solid var(--border);
+  padding: 1.5rem 2rem;
+}
+.site-header nav {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.site-header .logo {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+.site-header .logo span { color: var(--accent); }
+.site-header .nav-links {
+  display: flex;
+  gap: 2rem;
+  list-style: none;
+}
+.site-header .nav-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 0.15s ease;
+}
+.site-header .nav-links a:hover { color: var(--text); }
+
+/* main */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 4rem 2rem;
+}
+
+/* hero */
+.hero { padding: 3rem 0 5rem; }
+.hero h1 {
+  font-size: 2.4rem;
+  font-weight: 400;
+  line-height: 1.3;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.01em;
+}
+.hero h1 strong { font-weight: 700; }
+.hero p {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  max-width: 540px;
+  margin-bottom: 2rem;
+}
+.hero .cta-row { display: flex; gap: 1rem; }
+.btn {
+  display: inline-block;
+  padding: 0.7rem 1.6rem;
+  border: 1px solid var(--accent-dim);
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background 0.15s ease;
+  font-family: inherit;
+}
+.btn:hover { background: rgba(123,97,255,0.1); }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.btn-primary:hover { background: #6a50e0; color: #fff; }
+
+/* section */
+section { margin-bottom: 5rem; }
+section h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: 2rem;
+  font-weight: 400;
+}
+
+/* about */
+.about p { margin-bottom: 1.2rem; color: var(--text-muted); }
+.about p:last-child { margin-bottom: 0; }
+
+/* work grid */
+.work-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+.work-card {
+  border: 1px solid var(--border);
+  padding: 1.8rem;
+  transition: border-color 0.15s ease;
+}
+.work-card:hover { border-color: var(--accent-dim); }
+.work-card h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+.work-card .meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.work-card p {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+.work-card a {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  transition: border-color 0.15s ease;
+}
+.work-card a:hover { border-color: var(--accent); }
+
+/* essays list */
+.essay-list { list-style: none; }
+.essay-list li {
+  border-bottom: 1px solid var(--border);
+  padding: 1.4rem 0;
+}
+.essay-list li:last-child { border-bottom: none; }
+.essay-list .essay-title {
+  font-size: 1.1rem;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+.essay-list .essay-title:hover { color: var(--accent); }
+.essay-list .essay-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+}
+
+/* connect */
+.connect-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+.connect-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.connect-link:hover { border-color: var(--accent-dim); color: var(--text); }
+.connect-link .icon { font-size: 1.2rem; }
+
+/* essay page */
+.essay-header { margin-bottom: 3rem; }
+.essay-header h1 {
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1.3;
+  margin-bottom: 0.8rem;
+}
+.essay-header .essay-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.essay-body h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 2.5rem 0 1rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.essay-body p {
+  margin-bottom: 1.2rem;
+  color: var(--text-muted);
+}
+.essay-body strong { color: var(--text); }
+.essay-body ul, .essay-body ol {
+  margin: 0 0 1.2rem 1.5rem;
+  color: var(--text-muted);
+}
+.essay-body li { margin-bottom: 0.5rem; }
+.essay-body blockquote {
+  border-left: 3px solid var(--accent-dim);
+  padding-left: 1.2rem;
+  margin: 1.5rem 0;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.essay-body code {
+  background: var(--surface);
+  padding: 0.15rem 0.4rem;
+  font-size: 0.85em;
+  font-family: 'Menlo', 'Monaco', monospace;
+  border-radius: 3px;
+}
+.essay-body pre {
+  background: var(--surface);
+  padding: 1.2rem;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  border-radius: 4px;
+}
+.essay-body pre code { background: none; padding: 0; }
+.essay-back {
+  display: inline-block;
+  margin-top: 3rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+}
+.essay-back:hover { color: var(--accent); border-color: var(--accent); }
+
+/* footer */
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding: 2rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* responsive */
+@media (max-width: 600px) {
+  .hero h1 { font-size: 1.8rem; }
+  .hero p { font-size: 1rem; }
+  .hero .cta-row { flex-direction: column; }
+  .container { padding: 2.5rem 1.5rem; }
+  .site-header { padding: 1rem 1.5rem; }
+  .site-header .nav-links { gap: 1rem; }
+}
+
+/* selection */
+::selection { background: var(--accent-dim); color: #fff; }
+
+/* focus for accessibility */
+a:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
