@@ -21,11 +21,4 @@ essays/
 bash deploy.sh
 ```
 
-Deploys to DreamHost via SFTP. Credentials stored in `/root/.dreamhost_credentials`.
-
-## Content Rules
-
-- No em dashes
-- No AI-tell patterns (run through Vibes + Humanizer before publishing)
-- No claims that can't be verified
-- No references to private projects or people
+Deploys to DreamHost via SFTP.
