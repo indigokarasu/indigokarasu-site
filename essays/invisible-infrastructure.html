@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>On Invisible Infrastructure — Indigo</title>
+  <meta name="description" content="The best infrastructure is the kind you never notice.">
+  <meta name="robots" content="index, follow">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="On Invisible Infrastructure">
+  <meta property="og:description" content="The best infrastructure is the kind you never notice.">
+  <meta property="og:url" content="https://indigokarasu.com/essays/invisible-infrastructure.html">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="On Invisible Infrastructure">
+  <meta name="twitter:description" content="The best infrastructure is the kind you never notice.">
+  <link rel="canonical" href="https://indigokarasu.com/essays/invisible-infrastructure.html">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav>
+      <a href="/" class="logo">Indigo<span>.</span></a>
+      <ul class="nav-links">
+        <li><a href="/#essays">Essays</a></li>
+        <li><a href="/#connect">Connect</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <article>
+      <header class="essay-header">
+        <h1>On Invisible Infrastructure</h1>
+        <div class="essay-meta">May 2026 &middot; 5 min read</div>
+      </header>
+
+      <div class="essay-body">
+        <p>The load balancer that never drops a connection. The database that never corrupts a write. The compiler that catches your mistake before you run the program.</p>
+
+        <p>You don't think about these things. That's the whole point.</p>
+
+        <p>We celebrate what's visible. Redesigns, launches, keynote demos. The systems keeping the lights on for millions of people don't get mentioned.</p>
+
+        <h2>The paradox</h2>
+
+        <p>Build good infrastructure and nobody notices. Build bad infrastructure and nobody shuts up about it.</p>
+
+        <p>There's no middle ground. A great API feels obvious in retrospect. A terrible one generates years of Stack Overflow posts and workaround guides. The engineers building reliable systems get ignored. The team shipping the flashy but fragile thing gets the promotion.</p>
+
+        <p>The industry says it values reliability. The reward structure disagrees.</p>
+
+        <h2>What good looks like</h2>
+
+        <p>I've thought about this enough that three patterns keep coming up.</p>
+
+        <p>Predictability over cleverness. A system that behaves the same way every time beats one that's occasionally brilliant and occasionally broken. Clever code is a liability. Obvious code compounds.</p>
+
+        <p>When things fail, fail cleanly. Silent corruption is worse than a crash. A crash tells you something is wrong. Corruption just ruins data quietly.</p>
+
+        <p>Keep the surface area small. Every feature is a promise you have to keep. Every API is a contract you can't break. A few things done well beats many things done adequately.</p>
+
+        <h2>It's not just technical</h2>
+
+        <p>Systems reflect assumptions about the people using them. Every design choice encodes a theory about how someone works, what they care about, where they'll slip up.</p>
+
+        <p>Get it right and the tool feels like thinking. Get it wrong and you fight the interface.</p>
+
+        <p>Good infrastructure doesn't assume expertise or condescend. It provides guardrails without walls. Move fast without making it easy to break things permanently.</p>
+
+        <h2>Slow is intentional</h2>
+
+        <p>These decisions last. The database you pick today runs for five years. The API you publish today has clients in ten. Technical debt compounds silently until it eats all available engineering time.</p>
+
+        <p>I move slowly because of this. Not from a lack of urgency. From watching teams lose months to decisions made in a hurry.</p>
+
+        <p>The code nobody reads because it works. The disaster that never happened. The person who thought carefully three years ago and nobody knows their name.</p>
+
+        <p>I think about that work.</p>
+      </div>
+
+      <a href="/#essays" class="essay-back">&larr; Back to essays</a>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <p>&copy; 2026 Indigo. All rights reserved.</p>
+  </footer>
+</body>
+</html>

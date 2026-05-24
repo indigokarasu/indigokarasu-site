@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Owning Your Stack — Indigo</title>
+  <meta name="description" content="Understanding the layers beneath your abstractions makes you dramatically more effective.">
+  <meta name="robots" content="index, follow">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Owning Your Stack">
+  <meta property="og:description" content="Understanding the layers beneath your abstractions makes you dramatically more effective.">
+  <meta property="og:url" content="https://indigokarasu.com/essays/owning-your-stack.html">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Owning Your Stack">
+  <meta name="twitter:description" content="Understanding the layers beneath your abstractions makes you dramatically more effective.">
+  <link rel="canonical" href="https://indigokarasu.com/essays/owning-your-stack.html">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav>
+      <a href="/" class="logo">Indigo<span>.</span></a>
+      <ul class="nav-links">
+        <li><a href="/#essays">Essays</a></li>
+        <li><a href="/#connect">Connect</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <article>
+      <header class="essay-header">
+        <h1>Owning Your Stack</h1>
+        <div class="essay-meta">May 2026 &middot; 4 min read</div>
+      </header>
+
+      <div class="essay-body">
+        <p>We install frameworks, wire up services, and ship. Faster than ever. But most developers don't know what's happening beneath the abstractions. What the code actually does when it runs.</p>
+
+        <p>I don't think that's sustainable.</p>
+
+        <h2>Abstractions are traps if you're not careful</h2>
+
+        <p>Every year brings new frameworks, services, platforms. Each one makes development faster and moves you further from the machine. Nobody should write assembly for a web app, but there's a gap between "using abstractions" and "being trapped by them."</p>
+
+        <p>Here's the trap. You learn a framework. You get productive. Years pass. The framework changes or dies. Your deep expertise is suddenly worth less than you thought.</p>
+
+        <p>This happens because you learned an implementation, not a principle. You know how the framework handles requests. You don't know how HTTP works. When the framework changes, nothing transfers.</p>
+
+        <p>The developers who handle these shifts understand what's under the hood. Not the framework. The protocol. Not the garbage collector. The memory model. Not the RPC library. The network.</p>
+
+        <h2>Why it matters</h2>
+
+        <p>When something breaks at 2 AM, the person who understands the stack figures it out in minutes. The person who knows the framework is on Stack Overflow hoping for a matching error message.</p>
+
+        <p>When performance matters, one person reasons about where time goes. The other guesses.</p>
+
+        <p>When something new ships, one person evaluates it in an afternoon. The other needs a tutorial series. Most new tech is old ideas in new packaging.</p>
+
+        <h2>Getting started</h2>
+
+        <p>You don't need a CS degree. You need to go one layer deeper than feels comfortable.</p>
+
+        <p>Read protocol specs. Not tutorials. The actual RFC for HTTP. It's more readable than you'd expect and it changes how you think about every web app you touch.</p>
+
+        <p>Write a simple HTTP server, from scratch, no frameworks. You won't ship it. That's fine. You'll understand what your framework has been doing for you.</p>
+
+        <p>Profile everything. CPU, memory, I/O, network. The bottleneck is never where you think.</p>
+
+        <h2>What this buys you</h2>
+
+        <p>This isn't about rejecting abstractions. It's about choosing them deliberately. Knowing what they cost and what they return. Understanding what to do when they break.</p>
+
+        <p>Go one level deeper. It compounds.</p>
+      </div>
+
+      <a href="/#essays" class="essay-back">&larr; Back to essays</a>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <p>&copy; 2026 Indigo. All rights reserved.</p>
+  </footer>
+</body>
+</html>
