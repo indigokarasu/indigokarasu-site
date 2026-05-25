@@ -478,9 +478,90 @@
     .nav { gap: 1.2rem; }
     .nav a { font-size: 0.7rem; }
   }
+
+  /* === terminal boot overlay === */
+  #boot-terminal {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #000; color: #0f0;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 0.82rem; line-height: 1.5;
+    padding: 2rem; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-all;
+    transition: opacity 0.8s ease, visibility 0.8s;
+  }
+  #boot-terminal.done {
+    opacity: 0; visibility: hidden; pointer-events: none;
+  }
+  #boot-terminal .log-line { opacity: 0; animation: fadeIn 0.05s forwards; }
+  #boot-terminal .log-ok { color: #0f0; }
+  #boot-terminal .log-warn { color: #ff0; }
+  #boot-terminal .log-info { color: #0ff; }
+  #boot-terminal .log-dim { color: #555; }
+  #boot-terminal .log-err { color: #f44; }
+  #boot-terminal .log-cursor {
+    display: inline-block; width: 7px; height: 1.1em;
+    background: #0f0; vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes fadeIn { to { opacity: 1; } }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* === system log panel === */
+  #syslog {
+    position: fixed; bottom: 0; right: 0; z-index: 50;
+    width: 380px; max-height: 260px; overflow-y: auto;
+    background: rgba(0,0,0,0.88); border-left: 2px solid var(--accent-border);
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 0.7rem; line-height: 1.6;
+    padding: 1rem;
+    transform: translateY(calc(100% - 28px));
+    transition: transform 0.3s ease;
+  }
+  #syslog:hover, #syslog.open { transform: translateY(0); }
+  #syslog .syslog-header {
+    position: sticky; top: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 0.5rem; margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--accent); font-size: 0.65rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  #syslog .syslog-entry {
+    color: var(--text-dim); border-bottom: 1px solid rgba(255,255,255,0.03);
+    padding: 0.3rem 0;
+  }
+  #syslog .syslog-entry .time { color: var(--text-dim); opacity: 0.5; margin-right: 0.5rem; }
+  #syslog .syslog-entry .repo { color: var(--accent); }
+  #syslog .syslog-entry .msg { color: var(--text); }
+  #syslog-toggle {
+    position: fixed; bottom: 4px; right: 1rem; z-index: 51;
+    font-family: 'Courier New', monospace; font-size: 0.65rem;
+    color: var(--text-dim); background: none; border: none;
+    cursor: pointer; padding: 2px 6px;
+  }
+  #syslog-toggle:hover { color: var(--accent); }
+  @media (max-width: 640px) {
+    #syslog { width: 100%; max-height: 200px; }
+    #syslog-toggle { display: none; }
+  }
   </style>
 </head>
 <body>
+  <!-- terminal boot sequence -->
+  <div id="boot-terminal"></div>
+
+  <!-- system log toggle -->
+  <button id="syslog-toggle" onclick="document.getElementById('syslog').classList.toggle('open')">[syslog]</button>
+
+  <!-- system log panel -->
+  <div id="syslog">
+    <div class="syslog-header">
+      <span>◆ indigo@karasu ~ system activity</span>
+      <span id="syslog-status">connecting…</span>
+    </div>
+    <div id="syslog-entries"></div>
+  </div>
+
   <div class="cursor-glow" id="cursorGlow"></div>
   <div class="noise-overlay" id="noiseOverlay"></div>
   <div class="scanline-static"></div>
@@ -506,28 +587,222 @@
     <section class="section" id="connect">
       <div class="section-label"><span class="glitch-wrapper" data-text="Connect">Connect</span></div>
       <div class="link-grid">
-        <a href="https://indigokarasu.com" class="link-card">This Site</a>
-        <a href="https://github.com/indigokarasu/indigokarasu-site" class="link-card">Site Source</a>
         <a href="https://github.com/indigokarasu" class="link-card">GitHub</a>
         <a href="https://www.linkedin.com/in/indigokarasu" class="link-card">LinkedIn</a>
         <a href="https://bsky.app/profile/indigokarasu" class="link-card">Bluesky</a>
+        <a href="https://x.com/mxkarasu" class="link-card">X / Twitter</a>
+        <a href="https://mastodon.social/@indigokarasu" class="link-card">Mastodon</a>
       </div>
     </section>
   </main>
 
   <footer>
     <p>&copy; 2026 Indigo.</p>
-  </footer>
+  <div class="scanline-sweep-2" id="scanlineSweep2"></div>
+
+  <script>
+  // ============================================================
+  // BOOT TERMINAL — visitor intel + weather + color scheme
+  // ============================================================
+  (async function bootSequence() {
+    const term = document.getElementById('boot-terminal');
+    const glitchChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`ÄÖÜßØÆÐŁ';
+    let bootData = { ip: null, city: null, region: null, country: null, lat: null, lon: null, weather: null, temp: null, condition: null, isDay: true, timezone: null, cookies: {}, nav: {} };
+
+    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function typeHTML(html) {
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      div.innerHTML = html;
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function typeLine(cls, text) {
+      typeHTML(`<span class="${cls}">${esc(text)}</span>`);
+    }
+
+    // Phase 1 — banner
+    typeHTML(`<span class="log-dim">╔══════════════════════════════════════════════╗
+║  INDIGO KARASU — SECURE SHELL v3.7.1      ║
+║  connection initiated                       ║
+╚══════════════════════════════════════════════╝</span>`);
+    await new Promise(r => setTimeout(r, 400));
+
+    // Phase 2 — navigator telemetry
+    typeLine('log-info', `[info] gathering client telemetry...`);
+    bootData.nav = {
+      platform: navigator.platform || 'unknown',
+      lang: navigator.language || 'unknown',
+      cores: navigator.hardwareConcurrency || '?',
+      screen: `${screen.width}x${screen.height}`,
+      dpr: window.devicePixelRatio || 1,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown',
+    };
+    await new Promise(r => setTimeout(r, 300));
+    typeLine('log-dim', `  platform: ${bootData.nav.platform}`);
+    typeLine('log-dim', `  screen:   ${bootData.nav.screen} @${bootData.nav.dpr}x`);
+    typeLine('log-dim', `  timezone: ${bootData.nav.tz}`);
+    typeLine('log-dim', `  cores:    ${bootData.nav.cores}`);
+    typeLine('log-dim', `  lang:     ${bootData.nav.lang}`);
+
+    // Phase 3 — cookie scan
+    await new Promise(r => setTimeout(r, 250));
+    typeLine('log-warn', `[scan] inspecting client artifacts...`);
+    const interestingKeys = [];
+    if (document.cookie) {
+      document.cookie.split(';').forEach(c => {
+        const eq = c.indexOf('=');
+        const k = c.substring(0, eq).trim();
+        const v = c.substring(eq + 1).trim();
+        bootData.cookies[k] = v;
+        const lower = k.toLowerCase();
+        if (lower.includes('name') || lower.includes('user') || lower.includes('email') || lower.includes('token') || lower.includes('session') || lower.includes('id')) {
+          interestingKeys.push(k);
+          typeLine('log-err', `  ★ ${k} = "${v.substring(0,40)}${v.length>40?'...':''}"`);
+        }
+      });
+    }
+    if (interestingKeys.length === 0) {
+      typeLine('log-dim', `  no interesting artifacts found`);
+    }
+    await new Promise(r => setTimeout(r, 300));
+
+    // Phase 4 — IP geolocation
+    typeLine('log-info', `[net] resolving origin...`);
+    try {
+      const geo = await fetch('https://ipapi.co/json/').then(r => r.json());
+      bootData.ip = geo.ip;
+      bootData.city = geo.city;
+      bootData.region = geo.region;
+      bootData.country = geo.country_name;
+      bootData.lat = geo.latitude;
+      bootData.lon = geo.longitude;
+      bootData.timezone = geo.timezone;
+      typeLine('log-ok', `  ✓ ip: ${bootData.ip}`);
+      typeLine('log-ok', `  ✓ location: ~${bootData.city}, ${bootData.region}, ${bootData.country}`);
+      typeLine('log-dim', `  coords: ${bootData.lat.toFixed(4)}, ${bootData.lon.toFixed(4)}`);
+    } catch(e) {
+      typeLine('log-err', `  ✗ geolocation failed: ${e.message}`);
+      bootData.lat = 40.7128; bootData.lon = -74.0060;
+      bootData.city = 'Unknown'; bootData.country = '';
+    }
+    await new Promise(r => setTimeout(r, 350));
+
+    // Phase 5 — weather
+    typeLine('log-info', `[env] fetching atmospheric conditions...`);
+    try {
+      const wurl = `https://api.open-meteo.com/v1/forecast?latitude=${bootData.lat}&longitude=${bootData.lon}&current=temperature_2m,weather_code,is_day&timezone=auto`;
+      const w = await fetch(wurl).then(r => r.json());
+      bootData.temp = w.current.temperature_2m;
+      bootData.weather = w.current.weather_code;
+      bootData.isDay = w.current.is_day === 1;
+      const cond = {0:'clear sky',1:'mainly clear',2:'partly cloudy',3:'overcast',45:'fog',48:'rime fog',51:'light drizzle',53:'moderate drizzle',55:'dense drizzle',61:'slight rain',63:'moderate rain',65:'heavy rain',71:'slight snow',73:'moderate snow',75:'heavy snow',80:'slight showers',81:'moderate showers',82:'violent showers',95:'thunderstorm',96:'thunderstorm + hail',99:'thunderstorm + heavy hail'};
+      bootData.condition = cond[bootData.weather] || 'unknown';
+      typeLine('log-ok', `  ✓ temp: ${bootData.temp}°C`);
+      typeLine('log-ok', `  ✓ condition: ${bootData.condition}`);
+      typeLine('log-ok', `  ✓ ${bootData.isDay ? 'daylight' : 'night'}`);
+    } catch(e) {
+      typeLine('log-err', `  ✗ weather failed: ${e.message}`);
+      bootData.temp = 20; bootData.condition = 'clear sky'; bootData.isDay = true;
+    }
+    await new Promise(r => setTimeout(r, 300));
+
+    // Phase 6 — color scheme from weather
+    typeLine('log-info', `[render] computing environmental color matrix...`);
+    let bg, text, accent;
+    const storm = [95,96,99,82], rain = [51,53,55,56,61,63,65,80,81], snow = [71,73,75,77,85,86], fog = [45,48];
+    if (storm.includes(bootData.weather)) { bg='#0a060e'; text='#d0c8e0'; accent='#a855f7'; }
+    else if (rain.includes(bootData.weather)) { bg='#080c10'; text='#c8d4dc'; accent='#22d3ee'; }
+    else if (snow.includes(bootData.weather)) { bg='#0c0e14'; text='#e0e8f0'; accent='#93c5fd'; }
+    else if (fog.includes(bootData.weather)) { bg='#0a0c0a'; text='#c8ccc8'; accent='#86efac'; }
+    else if (!bootData.isDay) { bg='#080608'; text='#d0c8c0'; accent='#f59e0b'; }
+    else if (bootData.temp > 30) { bg='#0e0a06'; text='#e0d0c0'; accent='#f97316'; }
+    else if (bootData.temp > 20) { bg='#0c0a06'; text='#d8d0c0'; accent='#eab308'; }
+    else if (bootData.temp > 10) { bg='#080a0c'; text='#c8d0d8'; accent='#7b61ff'; }
+    else { bg='#06080e'; text='#c0c8e0'; accent='#3b82f6'; }
+
+    document.documentElement.style.setProperty('--bg', bg);
+    document.documentElement.style.setProperty('--text', text);
+    document.documentElement.style.setProperty('--accent', accent);
+    document.documentElement.style.setProperty('--accent-glow', accent + '22');
+    document.documentElement.style.setProperty('--accent-border', accent + '33');
+    typeLine('log-ok', `  ✓ palette: ${bootData.condition}, ${bootData.temp}°C`);
+    await new Promise(r => setTimeout(r, 300));
+
+    // Phase 7 — connection summary
+    const stormy = storm.includes(bootData.weather) || rain.includes(bootData.weather);
+    const intensity = stormy ? 'HIGH' : (bootData.isDay ? 'LOW' : 'MED');
+    typeLine('log-warn', `[system] interference: ${intensity}`);
+    if (stormy) typeLine('log-err', '  ⚡ atmospheric disturbance — maximizing corruption');
+    await new Promise(r => setTimeout(r, 350));
+
+    typeHTML(`<span class="log-ok">═══════════════════════════════════════════════
+  CONNECTION ESTABLISHED
+  visitor ≈ ${bootData.city}, ${bootData.country}
+  weather: ${bootData.condition}, ${bootData.temp}°C
+  local time: ${new Date().toLocaleTimeString('en-US', {timeZone: bootData.timezone || 'UTC'})}
+  corruption: ${intensity}
+═══════════════════════════════════════════════</span>`);
+    await new Promise(r => setTimeout(r, 1000));
+
+    window.__bootData = bootData;
+    term.classList.add('done');
+    setTimeout(() => { term.style.display = 'none'; }, 900);
+  })();
+  </script>
+
+  <script>
+  // ============================================================
+  // GITHUB ACTIVITY FEED
+  // ============================================================
+  (async function loadGitHubFeed() {
+    const entries = document.getElementById('syslog-entries');
+    const statusEl = document.getElementById('syslog-status');
+    function addEntry(time, repo, msg) {
+      const d = document.createElement('div');
+      d.className = 'syslog-entry';
+      const t = new Date(time);
+      const ts = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+      d.innerHTML = `<span class="time">${ts}</span><span class="repo">${repo}</span> <span class="msg">${msg}</span>`;
+      entries.prepend(d);
+      while (entries.children.length > 50) entries.removeChild(entries.lastChild);
+    }
+    try {
+      const evts = await fetch('https://api.github.com/users/indigokarasu/events?per_page=30').then(r => r.json());
+      if (!Array.isArray(evts)) throw new Error('rate limited');
+      statusEl.textContent = `✓ ${evts.length} events`;
+      statusEl.style.color = 'var(--accent)';
+      const map = {
+        PushEvent: e => `push → ${e.payload?.commits?.length||0} commit${(e.payload?.commits?.length||0)!==1?'s':''}${e.payload?.commits?.[0]?.message? '\n    └ '+e.payload.commits[0].message.split('\n')[0]:''}`,
+        CreateEvent: e => `create ${e.payload?.ref_type||'ref'}${e.payload?.ref?': '+e.payload.ref:''}`,
+        IssuesEvent: e => `${e.payload?.action} issue #${e.payload?.issue?.number}`,
+        PullRequestEvent: e => `${e.payload?.action} PR #${e.payload?.pull_request?.number}`,
+        IssueCommentEvent: e => `comment on #${e.payload?.issue?.number}`,
+        WatchEvent: e => 'starred ★',
+        ForkEvent: e => 'forked ⑂',
+        ReleaseEvent: e => `released ${e.payload?.release?.tag_name||''}`,
+      };
+      let n = 0;
+      for (const e of evts) {
+        if (!map[e.type]) continue;
+        const repo = e.repo?.name?.replace('indigokarasu/','./')||'?';
+        addEntry(e.created_at, repo, map[e.type](e));
+        if (++n >= 15) break;
+      }
+      setTimeout(loadGitHubFeed, 60000);
+    } catch(e) {
+      statusEl.textContent = '✗ offline';
+      statusEl.style.color = '#f44';
+      addEntry(new Date().toISOString(), 'system', 'rate-limited — retrying in 30s');
+      setTimeout(loadGitHubFeed, 30000);
+    }
+  })();
+  </script>
 
   <script>
   // cursor glow (desktop only)
-  const glow = document.getElementById('cursorGlow');
-  document.addEventListener('mousemove', e => {
-    glow.style.left = e.clientX + 'px';
-    glow.style.top = e.clientY + 'px';
-  });
-
-  // --- scroll-driven effects ---
   const noise = document.getElementById('noiseOverlay');
   const sweep = document.getElementById('scanlineSweep');
   const sweep2 = document.getElementById('scanlineSweep2');
