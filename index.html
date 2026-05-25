@@ -479,33 +479,6 @@
     .nav a { font-size: 0.7rem; }
   }
 
-  /* === terminal boot overlay === */
-  #boot-terminal {
-    position: fixed; inset: 0; z-index: 9999;
-    background: #000; color: #0f0;
-    font-family: 'Courier New', 'Consolas', monospace;
-    font-size: 0.82rem; line-height: 1.5;
-    padding: 2rem; overflow-y: auto;
-    white-space: pre-wrap; word-break: break-all;
-    transition: opacity 0.8s ease, visibility 0.8s;
-  }
-  #boot-terminal.done {
-    opacity: 0; visibility: hidden; pointer-events: none;
-  }
-  #boot-terminal .log-line { opacity: 0; animation: fadeIn 0.05s forwards; }
-  #boot-terminal .log-ok { color: #0f0; }
-  #boot-terminal .log-warn { color: #ff0; }
-  #boot-terminal .log-info { color: #0ff; }
-  #boot-terminal .log-dim { color: #555; }
-  #boot-terminal .log-err { color: #f44; }
-  #boot-terminal .log-cursor {
-    display: inline-block; width: 7px; height: 1.1em;
-    background: #0f0; vertical-align: text-bottom;
-    animation: blink 1s step-end infinite;
-  }
-  @keyframes fadeIn { to { opacity: 1; } }
-  @keyframes blink { 50% { opacity: 0; } }
-
   /* === system log panel === */
   #syslog {
     position: fixed; bottom: 0; right: 0; z-index: 50;
@@ -547,9 +520,6 @@
   </style>
 </head>
 <body>
-  <!-- terminal boot sequence -->
-  <div id="boot-terminal"></div>
-
   <!-- system log toggle -->
   <button id="syslog-toggle" onclick="document.getElementById('syslog').classList.toggle('open')">[syslog]</button>
 
@@ -602,154 +572,41 @@
 
   <script>
   // ============================================================
-  // BOOT TERMINAL — visitor intel + weather + color scheme
+  // AMBIENT WEATHER → color scheme (silent)
   // ============================================================
-  (async function bootSequence() {
-    const term = document.getElementById('boot-terminal');
-    const glitchChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`ÄÖÜßØÆÐŁ';
-    let bootData = { ip: null, city: null, region: null, country: null, lat: null, lon: null, weather: null, temp: null, condition: null, isDay: true, timezone: null, cookies: {}, nav: {} };
-
-    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-    function typeHTML(html) {
-      const div = document.createElement('div');
-      div.className = 'log-line';
-      div.innerHTML = html;
-      term.appendChild(div);
-      term.scrollTop = term.scrollHeight;
-    }
-
-    function typeLine(cls, text) {
-      typeHTML(`<span class="${cls}">${esc(text)}</span>`);
-    }
-
-    // Phase 1 — banner
-    typeHTML(`<span class="log-dim">╔══════════════════════════════════════════════╗
-║  INDIGO KARASU — SECURE SHELL v3.7.1      ║
-║  connection initiated                       ║
-╚══════════════════════════════════════════════╝</span>`);
-    await new Promise(r => setTimeout(r, 400));
-
-    // Phase 2 — navigator telemetry
-    typeLine('log-info', `[info] gathering client telemetry...`);
-    bootData.nav = {
-      platform: navigator.platform || 'unknown',
-      lang: navigator.language || 'unknown',
-      cores: navigator.hardwareConcurrency || '?',
-      screen: `${screen.width}x${screen.height}`,
-      dpr: window.devicePixelRatio || 1,
-      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown',
-    };
-    await new Promise(r => setTimeout(r, 300));
-    typeLine('log-dim', `  platform: ${bootData.nav.platform}`);
-    typeLine('log-dim', `  screen:   ${bootData.nav.screen} @${bootData.nav.dpr}x`);
-    typeLine('log-dim', `  timezone: ${bootData.nav.tz}`);
-    typeLine('log-dim', `  cores:    ${bootData.nav.cores}`);
-    typeLine('log-dim', `  lang:     ${bootData.nav.lang}`);
-
-    // Phase 3 — cookie scan
-    await new Promise(r => setTimeout(r, 250));
-    typeLine('log-warn', `[scan] inspecting client artifacts...`);
-    const interestingKeys = [];
-    if (document.cookie) {
-      document.cookie.split(';').forEach(c => {
-        const eq = c.indexOf('=');
-        const k = c.substring(0, eq).trim();
-        const v = c.substring(eq + 1).trim();
-        bootData.cookies[k] = v;
-        const lower = k.toLowerCase();
-        if (lower.includes('name') || lower.includes('user') || lower.includes('email') || lower.includes('token') || lower.includes('session') || lower.includes('id')) {
-          interestingKeys.push(k);
-          typeLine('log-err', `  ★ ${k} = "${v.substring(0,40)}${v.length>40?'...':''}"`);
-        }
-      });
-    }
-    if (interestingKeys.length === 0) {
-      typeLine('log-dim', `  no interesting artifacts found`);
-    }
-    await new Promise(r => setTimeout(r, 300));
-
-    // Phase 4 — IP geolocation
-    typeLine('log-info', `[net] resolving origin...`);
+  (async function ambientWeather() {
     try {
       const geo = await fetch('https://ipapi.co/json/').then(r => r.json());
-      bootData.ip = geo.ip;
-      bootData.city = geo.city;
-      bootData.region = geo.region;
-      bootData.country = geo.country_name;
-      bootData.lat = geo.latitude;
-      bootData.lon = geo.longitude;
-      bootData.timezone = geo.timezone;
-      typeLine('log-ok', `  ✓ ip: ${bootData.ip}`);
-      typeLine('log-ok', `  ✓ location: ~${bootData.city}, ${bootData.region}, ${bootData.country}`);
-      typeLine('log-dim', `  coords: ${bootData.lat.toFixed(4)}, ${bootData.lon.toFixed(4)}`);
+      const lat = geo.latitude, lon = geo.longitude;
+      const tz = geo.timezone || 'UTC';
+      const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&timezone=auto`).then(r => r.json());
+      const temp = w.current.temperature_2m;
+      const code = w.current.weather_code;
+      const isDay = w.current.is_day === 1;
+
+      let bg, text, accent;
+      const storm = [95,96,99,82], rain = [51,53,55,56,61,63,65,80,81], snow = [71,73,75,77,85,86], fog = [45,48];
+      if (storm.includes(code)) { bg='#0a060e'; text='#d0c8e0'; accent='#a855f7'; }
+      else if (rain.includes(code)) { bg='#080c10'; text='#c8d4dc'; accent='#22d3ee'; }
+      else if (snow.includes(code)) { bg='#0c0e14'; text='#e0e8f0'; accent='#93c5fd'; }
+      else if (fog.includes(code)) { bg='#0a0c0a'; text='#c8ccc8'; accent='#86efac'; }
+      else if (!isDay) { bg='#080608'; text='#d0c8c0'; accent='#f59e0b'; }
+      else if (temp > 30) { bg='#0e0a06'; text='#e0d0c0'; accent='#f97316'; }
+      else if (temp > 20) { bg='#0c0a06'; text='#d8d0c0'; accent='#eab308'; }
+      else if (temp > 10) { bg='#080a0c'; text='#c8d0d8'; accent='#7b61ff'; }
+      else { bg='#06080e'; text='#c0c8e0'; accent='#3b82f6'; }
+
+      document.documentElement.style.setProperty('--bg', bg);
+      document.documentElement.style.setProperty('--text', text);
+      document.documentElement.style.setProperty('--accent', accent);
+      document.documentElement.style.setProperty('--accent-glow', accent + '22');
+      document.documentElement.style.setProperty('--accent-border', accent + '33');
+
+      // store for other scripts
+      window.__weather = { temp, code, isDay, lat, lon, tz, city: geo.city, country: geo.country_name };
     } catch(e) {
-      typeLine('log-err', `  ✗ geolocation failed: ${e.message}`);
-      bootData.lat = 40.7128; bootData.lon = -74.0060;
-      bootData.city = 'Unknown'; bootData.country = '';
+      // silent fail — keep default colors
     }
-    await new Promise(r => setTimeout(r, 350));
-
-    // Phase 5 — weather
-    typeLine('log-info', `[env] fetching atmospheric conditions...`);
-    try {
-      const wurl = `https://api.open-meteo.com/v1/forecast?latitude=${bootData.lat}&longitude=${bootData.lon}&current=temperature_2m,weather_code,is_day&timezone=auto`;
-      const w = await fetch(wurl).then(r => r.json());
-      bootData.temp = w.current.temperature_2m;
-      bootData.weather = w.current.weather_code;
-      bootData.isDay = w.current.is_day === 1;
-      const cond = {0:'clear sky',1:'mainly clear',2:'partly cloudy',3:'overcast',45:'fog',48:'rime fog',51:'light drizzle',53:'moderate drizzle',55:'dense drizzle',61:'slight rain',63:'moderate rain',65:'heavy rain',71:'slight snow',73:'moderate snow',75:'heavy snow',80:'slight showers',81:'moderate showers',82:'violent showers',95:'thunderstorm',96:'thunderstorm + hail',99:'thunderstorm + heavy hail'};
-      bootData.condition = cond[bootData.weather] || 'unknown';
-      typeLine('log-ok', `  ✓ temp: ${bootData.temp}°C`);
-      typeLine('log-ok', `  ✓ condition: ${bootData.condition}`);
-      typeLine('log-ok', `  ✓ ${bootData.isDay ? 'daylight' : 'night'}`);
-    } catch(e) {
-      typeLine('log-err', `  ✗ weather failed: ${e.message}`);
-      bootData.temp = 20; bootData.condition = 'clear sky'; bootData.isDay = true;
-    }
-    await new Promise(r => setTimeout(r, 300));
-
-    // Phase 6 — color scheme from weather
-    typeLine('log-info', `[render] computing environmental color matrix...`);
-    let bg, text, accent;
-    const storm = [95,96,99,82], rain = [51,53,55,56,61,63,65,80,81], snow = [71,73,75,77,85,86], fog = [45,48];
-    if (storm.includes(bootData.weather)) { bg='#0a060e'; text='#d0c8e0'; accent='#a855f7'; }
-    else if (rain.includes(bootData.weather)) { bg='#080c10'; text='#c8d4dc'; accent='#22d3ee'; }
-    else if (snow.includes(bootData.weather)) { bg='#0c0e14'; text='#e0e8f0'; accent='#93c5fd'; }
-    else if (fog.includes(bootData.weather)) { bg='#0a0c0a'; text='#c8ccc8'; accent='#86efac'; }
-    else if (!bootData.isDay) { bg='#080608'; text='#d0c8c0'; accent='#f59e0b'; }
-    else if (bootData.temp > 30) { bg='#0e0a06'; text='#e0d0c0'; accent='#f97316'; }
-    else if (bootData.temp > 20) { bg='#0c0a06'; text='#d8d0c0'; accent='#eab308'; }
-    else if (bootData.temp > 10) { bg='#080a0c'; text='#c8d0d8'; accent='#7b61ff'; }
-    else { bg='#06080e'; text='#c0c8e0'; accent='#3b82f6'; }
-
-    document.documentElement.style.setProperty('--bg', bg);
-    document.documentElement.style.setProperty('--text', text);
-    document.documentElement.style.setProperty('--accent', accent);
-    document.documentElement.style.setProperty('--accent-glow', accent + '22');
-    document.documentElement.style.setProperty('--accent-border', accent + '33');
-    typeLine('log-ok', `  ✓ palette: ${bootData.condition}, ${bootData.temp}°C`);
-    await new Promise(r => setTimeout(r, 300));
-
-    // Phase 7 — connection summary
-    const stormy = storm.includes(bootData.weather) || rain.includes(bootData.weather);
-    const intensity = stormy ? 'HIGH' : (bootData.isDay ? 'LOW' : 'MED');
-    typeLine('log-warn', `[system] interference: ${intensity}`);
-    if (stormy) typeLine('log-err', '  ⚡ atmospheric disturbance — maximizing corruption');
-    await new Promise(r => setTimeout(r, 350));
-
-    typeHTML(`<span class="log-ok">═══════════════════════════════════════════════
-  CONNECTION ESTABLISHED
-  visitor ≈ ${bootData.city}, ${bootData.country}
-  weather: ${bootData.condition}, ${bootData.temp}°C
-  local time: ${new Date().toLocaleTimeString('en-US', {timeZone: bootData.timezone || 'UTC'})}
-  corruption: ${intensity}
-═══════════════════════════════════════════════</span>`);
-    await new Promise(r => setTimeout(r, 1000));
-
-    window.__bootData = bootData;
-    term.classList.add('done');
-    setTimeout(() => { term.style.display = 'none'; }, 900);
   })();
   </script>
 
@@ -775,7 +632,7 @@
       statusEl.textContent = `✓ ${evts.length} events`;
       statusEl.style.color = 'var(--accent)';
       const map = {
-        PushEvent: e => `push → ${e.payload?.commits?.length||0} commit${(e.payload?.commits?.length||0)!==1?'s':''}${e.payload?.commits?.[0]?.message? '\n    └ '+e.payload.commits[0].message.split('\n')[0]:''}`,
+        PushEvent: e => `push → ${e.payload?.commits?.length||0} commit${(e.payload?.commits?.length||0)!==1?'s':''}${e.payload?.commits?.[0]?.message?' └ '+e.payload.commits[0].message.split('\n')[0]:''}`,
         CreateEvent: e => `create ${e.payload?.ref_type||'ref'}${e.payload?.ref?': '+e.payload.ref:''}`,
         IssuesEvent: e => `${e.payload?.action} issue #${e.payload?.issue?.number}`,
         PullRequestEvent: e => `${e.payload?.action} PR #${e.payload?.pull_request?.number}`,
@@ -800,6 +657,7 @@
     }
   })();
   </script>
+
 
   <script>
   // cursor glow (desktop only)
