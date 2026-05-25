@@ -154,6 +154,18 @@
     74% { text-shadow: 2px 1px rgba(255,0,0,0.3), -2px -1px rgba(0,255,255,0.3); }
     75% { text-shadow: none; }
   }
+  @keyframes chroma-heavy {
+    0%, 100% { text-shadow: none; }
+    10% { text-shadow: -2px 0 rgba(255,0,0,0.5), 2px 0 rgba(0,255,255,0.5); }
+    20% { text-shadow: 3px -1px rgba(255,0,0,0.45), -3px 1px rgba(0,255,255,0.45); }
+    30% { text-shadow: -1px 2px rgba(255,0,0,0.5), 1px -2px rgba(0,255,255,0.5); }
+    40% { text-shadow: 2px 1px rgba(255,0,0,0.4), -2px -1px rgba(0,255,255,0.4); }
+    50% { text-shadow: none; }
+    60% { text-shadow: -3px 0 rgba(255,0,0,0.5), 3px 0 rgba(0,255,255,0.5); }
+    70% { text-shadow: 1px -1px rgba(255,0,0,0.45), -1px 1px rgba(0,255,255,0.45); }
+    80% { text-shadow: none; }
+    90% { text-shadow: -2px 1px rgba(255,0,0,0.5), 2px -1px rgba(0,255,255,0.5); }
+  }
 
   /* header */
   .top-bar {
@@ -186,8 +198,12 @@
     text-transform: uppercase;
     letter-spacing: 0.1em;
     transition: color 0.2s;
+    position: relative;
   }
-  .nav a:hover { color: var(--text); }
+  .nav a:hover {
+    color: var(--text);
+    animation: chromaberrate 0.6s infinite;
+  }
 
   /* hero */
   .hero {
@@ -252,6 +268,7 @@
     letter-spacing: -0.02em;
     margin-bottom: 2rem;
     position: relative;
+    animation: chromaberrate 8s infinite;
   }
   .hero h1 .glitch-wrapper {
     position: relative;
@@ -302,6 +319,7 @@
   .btn:hover {
     background: var(--accent-glow);
     border-color: var(--accent);
+    animation: chromaberrate 0.5s infinite;
   }
   .btn-primary {
     background: var(--accent);
@@ -312,6 +330,7 @@
   .btn-primary:hover {
     background: #6a50e0;
     box-shadow: 0 0 40px rgba(123,97,255,0.3);
+    animation: chromaberrate 0.4s infinite;
   }
 
   /* section styling */
@@ -399,7 +418,14 @@
     font-size: 0.88rem;
     transition: all 0.2s;
   }
-  .link-card:hover { border-color: var(--accent-border); color: var(--text); }
+  .link-card:hover {
+    border-color: var(--accent-border);
+    color: var(--text);
+    animation: chromaberrate 0.5s infinite;
+  }
+  .link-card.corrupting {
+    animation: chromaberrate 0.3s infinite;
+  }
   .link-card .icon { font-size: 1.1rem; }
 
   /* footer */
@@ -559,12 +585,12 @@
     lastScrollY = scrollY;
     scrollCount++;
 
-    // noise overlay — active while scrolling, lingers 600ms
+    // noise overlay — active while scrolling, lingers 700ms
     noise.classList.add('active');
     clearTimeout(noiseTimer);
-    noiseTimer = setTimeout(() => noise.classList.remove('active'), 600);
+    noiseTimer = setTimeout(() => noise.classList.remove('active'), 700);
 
-    // primary scanline sweep — purple, fast, on every scroll event
+    // primary scanline sweep — purple, fast
     if (scrollingDown) {
       sweep.classList.remove('active');
       void sweep.offsetWidth;
@@ -572,7 +598,7 @@
       clearTimeout(sweepTimer);
       sweepTimer = setTimeout(() => sweep.classList.remove('active'), 900);
 
-      // secondary scanline — cyan, slower, fires every 3rd scroll event
+      // secondary scanline — cyan, slower, every 3rd scroll
       if (scrollCount % 3 === 0) {
         sweep2.classList.remove('active');
         void sweep2.offsetWidth;
@@ -580,25 +606,37 @@
         clearTimeout(sweep2Timer);
         sweep2Timer = setTimeout(() => sweep2.classList.remove('active'), 1500);
       }
+
+      // random corruption on scroll: pick a random glitch-wrapper and corrupt it
+      if (scrollCount % 5 === 0) {
+        const allGlitches = document.querySelectorAll('.glitch-wrapper:not(.logo .glitch-wrapper)');
+        if (allGlitches.length) {
+          const pick = allGlitches[Math.floor(Math.random() * allGlitches.length)];
+          corruptText(pick, 250);
+          pick.classList.add('burst');
+          setTimeout(() => pick.classList.remove('burst'), 300);
+        }
+      }
     }
   }, { passive: true });
 
-  // random character corruption on glitch-wrapper elements
-  const glitchChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`';
-  function corruptText(el, duration) {
+  // --- character corruption engine ---
+  const glitchChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`ÄÖÜßØÆÐŁ';
+  function corruptText(el, duration, intensity) {
+    intensity = intensity || 0.3;
     const original = el.dataset.text || el.textContent.trim();
+    if (!original || original.length < 2) return;
     const chars = original.split('');
-    const corruptCount = Math.max(1, Math.floor(chars.length * 0.3));
+    const corruptCount = Math.max(1, Math.floor(chars.length * intensity));
     const indices = new Set();
     while (indices.size < corruptCount) {
-      indices.add(Math.floor(Math.random() * chars.length));
+      const idx = Math.floor(Math.random() * chars.length);
+      if (chars[idx] !== ' ') indices.add(idx); // skip spaces
     }
     const corrupted = chars.map((c, i) => indices.has(i) ? glitchChars[Math.floor(Math.random() * glitchChars.length)] : c).join('');
-    // Only corrupt text nodes, not the pseudo-element content
     el.childNodes.forEach(node => {
       if (node.nodeType === 3) node.textContent = corrupted;
     });
-    // Restore after duration
     setTimeout(() => {
       el.childNodes.forEach(node => {
         if (node.nodeType === 3) node.textContent = original;
@@ -606,17 +644,43 @@
     }, duration);
   }
 
-  // glitch burst + random corruption on .glitch-wrapper when they scroll into view
+  // ambient corruption: randomly corrupt small elements at random intervals
+  function ambientCorrupt() {
+    const targets = document.querySelectorAll('.date, .link-card, .section-label .glitch-wrapper, footer p');
+    if (!targets.length) return;
+    const el = targets[Math.floor(Math.random() * targets.length)];
+    const isLink = el.classList.contains('link-card');
+    // link cards get a class-based chroma, text gets corrupted
+    if (isLink) {
+      el.classList.add('corrupting');
+      setTimeout(() => el.classList.remove('corrupting'), 400);
+    }
+    corruptText(el, 200 + Math.random() * 300, 0.15 + Math.random() * 0.25);
+    // heavy chroma flash on the element
+    el.style.animation = 'none';
+    el.offsetHeight; // reflow
+    el.style.animation = 'chroma-heavy 0.3s 1';
+    setTimeout(() => { el.style.animation = ''; }, 400);
+  }
+  // Run ambient corruption every 1.5-4 seconds
+  function scheduleAmbient() {
+    setTimeout(() => {
+      ambientCorrupt();
+      scheduleAmbient();
+    }, 1500 + Math.random() * 2500);
+  }
+  scheduleAmbient();
+
+  // glitch burst + corruption on .glitch-wrapper scroll into view
   const glitchObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry, i) => {
       if (entry.isIntersecting) {
         const el = entry.target;
         el.classList.add('burst');
-        // Staggered burst timing for elements that appear together
         const delay = i * 200;
         setTimeout(() => {
-          corruptText(el, 400);
-          setTimeout(() => el.classList.remove('burst'), 600);
+          corruptText(el, 500, 0.4);
+          setTimeout(() => el.classList.remove('burst'), 700);
         }, delay);
         glitchObserver.unobserve(el);
       }
@@ -626,6 +690,40 @@
   document.querySelectorAll('.glitch-wrapper').forEach(el => {
     el.setAttribute('data-text', el.textContent.trim());
     glitchObserver.observe(el);
+  });
+
+  // link-card chroma + corruption on scroll into view
+  const linkCardObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) {
+        setTimeout(() => {
+          entry.target.classList.add('corrupting');
+          corruptText(entry.target, 350, 0.25);
+          setTimeout(() => entry.target.classList.remove('corrupting'), 500);
+        }, i * 150);
+        linkCardObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.3 });
+
+  document.querySelectorAll('.link-card').forEach(el => {
+    linkCardObserver.observe(el);
+  });
+
+  // essay date corruption on scroll into view
+  const dateObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        corruptText(entry.target, 300, 0.5);
+        entry.target.style.animation = 'chroma-heavy 0.4s 1';
+        setTimeout(() => { entry.target.style.animation = ''; }, 500);
+        dateObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.5 });
+
+  document.querySelectorAll('.date').forEach(el => {
+    dateObserver.observe(el);
   });
 
   // card pulse on scroll into view
@@ -639,22 +737,35 @@
     });
   }, { threshold: 0.2 });
 
-  document.querySelectorAll('.card, .essay-item, .link-card').forEach(el => {
+  document.querySelectorAll('.card, .essay-item').forEach(el => {
     cardObserver.observe(el);
   });
+
+  // footer corruption on page load
+  const footerEl = document.querySelector('footer p');
+  if (footerEl) {
+    setTimeout(() => {
+      corruptText(footerEl, 400, 0.3);
+      footerEl.style.animation = 'chroma-heavy 0.5s 1';
+      setTimeout(() => { footerEl.style.animation = ''; }, 600);
+    }, 2000);
+    // repeat occasionally
+    setInterval(() => {
+      corruptText(footerEl, 300, 0.2);
+    }, 15000);
+  }
 
   // logo glitch on page load — one strong burst then settle
   const logoEl = document.querySelector('.logo .glitch-wrapper');
   if (logoEl) {
     logoEl.classList.add('burst');
-    corruptText(logoEl, 300);
-    setTimeout(() => logoEl.classList.remove('burst'), 500);
-    // Repeat occasionally
+    corruptText(logoEl, 400, 0.5);
+    setTimeout(() => logoEl.classList.remove('burst'), 600);
     setInterval(() => {
       logoEl.classList.add('burst');
-      corruptText(logoEl, 200);
-      setTimeout(() => logoEl.classList.remove('burst'), 400);
-    }, 12000);
+      corruptText(logoEl, 250, 0.35);
+      setTimeout(() => logoEl.classList.remove('burst'), 500);
+    }, 10000);
   }
   </script>
 </body>
