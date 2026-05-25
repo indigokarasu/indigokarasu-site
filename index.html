@@ -145,6 +145,15 @@
     80% { background-position: 25% 35%; }
     90% { background-position: -10% 10%; }
   }
+  @keyframes chromaberrate {
+    0%, 100% { text-shadow: none; }
+    15% { text-shadow: -1px 0 rgba(255,0,0,0.3), 1px 0 rgba(0,255,255,0.3); }
+    30% { text-shadow: 1px 0 rgba(255,0,0,0.25), -1px 0 rgba(0,255,255,0.25); }
+    45% { text-shadow: none; }
+    73% { text-shadow: -2px 0 rgba(255,0,0,0.35), 2px 0 rgba(0,255,255,0.35); }
+    74% { text-shadow: 2px 1px rgba(255,0,0,0.3), -2px -1px rgba(0,255,255,0.3); }
+    75% { text-shadow: none; }
+  }
 
   /* header */
   .top-bar {
@@ -219,6 +228,20 @@
     opacity: 1;
     animation: scanline-sweep 0.8s linear forwards;
   }
+  .scanline-sweep-2 {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    pointer-events: none;
+    z-index: 1000;
+    background: rgba(0,255,255,0.08);
+    box-shadow: 0 0 8px 2px rgba(0,255,255,0.06);
+    opacity: 0;
+  }
+  .scanline-sweep-2.active {
+    opacity: 1;
+    animation: scanline-sweep 1.4s linear forwards;
+  }
 
   /* card pulse class (toggled by JS on scroll) */
   .card-pulse { animation: card-pulse 0.8s ease-out; }
@@ -239,6 +262,10 @@
     color: var(--text-dim);
     max-width: 480px;
     margin-bottom: 2.5rem;
+    animation: chromaberrate 6s infinite;
+  }
+  .hero p:hover {
+    animation: chromaberrate 0.8s infinite;
   }
 
   /* noise overlay — triggers on scroll, stronger on mobile */
@@ -402,16 +429,31 @@
   }
   .glitch-wrapper::before { color: #0ff; z-index: -1; }
   .glitch-wrapper::after  { color: #f0f; z-index: -1; }
-  /* subtle idle glitch on hero heading */
+  /* subtle idle glitch on hero heading + logo */
   .hero .glitch-wrapper::before { animation: glitch-1 4s infinite linear; opacity: 0.45; }
   .hero .glitch-wrapper::after  { animation: glitch-2 4s infinite linear; opacity: 0.45; }
+  .logo .glitch-wrapper { animation: flicker 8s infinite; }
+  /* non-hero glitch: burst only on scroll-into-view */
+  .glitch-wrapper { cursor: default; }
+  .section-label .glitch-wrapper::before,
+  .section-label .glitch-wrapper::after,
+  .essay-item .glitch-wrapper::before,
+  .essay-item .glitch-wrapper::after {
+    opacity: 0;
+  }
   /* intensified burst class (toggled by JS on scroll) */
   .glitch-wrapper.burst::before,
   .glitch-wrapper.burst::after {
-    opacity: 0.8;
+    opacity: 0.85;
   }
-  .glitch-wrapper.burst::before { animation: glitch-1 0.15s infinite; }
-  .glitch-wrapper.burst::after  { animation: glitch-2 0.15s infinite; }
+  .glitch-wrapper.burst::before { animation: glitch-1 0.12s infinite; }
+  .glitch-wrapper.burst::after  { animation: glitch-2 0.12s infinite; }
+  /* section label burst: cyan/magenta color shift */
+  .section-label .glitch-wrapper.burst::before { color: #0ff; }
+  .section-label .glitch-wrapper.burst::after  { color: #f0f; }
+  /* essay title burst: same */
+  .essay-item .glitch-wrapper.burst::before { color: #0ff; }
+  .essay-item .glitch-wrapper.burst::after  { color: #f0f; }
 
   /* cursor glow */
   .cursor-glow {
@@ -441,9 +483,10 @@
   <div class="noise-overlay" id="noiseOverlay"></div>
   <div class="scanline-static"></div>
   <div class="scanline-sweep" id="scanlineSweep"></div>
+  <div class="scanline-sweep-2" id="scanlineSweep2"></div>
 
   <header class="top-bar">
-    <a href="/" class="logo">Indigo<span class="dot">.</span></a>
+    <a href="/" class="logo"><span class="glitch-wrapper" data-text="Indigo">Indigo</span><span class="dot">.</span></a>
     <nav class="nav">
       <a href="/#essays">Essays</a>
       <a href="/#connect">Connect</a>
@@ -461,25 +504,25 @@
     </section>
 
     <section class="section" id="essays">
-      <div class="section-label">Essays</div>
+      <div class="section-label"><span class="glitch-wrapper" data-text="Essays">Essays</span></div>
       <ul class="essay-list">
         <li class="essay-item">
-          <a href="/essays/invisible-infrastructure.html">On Invisible Infrastructure</a>
+          <a href="/essays/invisible-infrastructure.html"><span class="glitch-wrapper" data-text="On Invisible Infrastructure">On Invisible Infrastructure</span></a>
           <div class="date">May 2026 ~ 5 min read</div>
         </li>
         <li class="essay-item">
-          <a href="/essays/tools-should-disappear.html">Tools Should Disappear</a>
+          <a href="/essays/tools-should-disappear.html"><span class="glitch-wrapper" data-text="Tools Should Disappear">Tools Should Disappear</span></a>
           <div class="date">May 2026 ~ 4 min read</div>
         </li>
         <li class="essay-item">
-          <a href="/essays/owning-your-stack.html">Owning Your Stack</a>
+          <a href="/essays/owning-your-stack.html"><span class="glitch-wrapper" data-text="Owning Your Stack">Owning Your Stack</span></a>
           <div class="date">May 2026 ~ 4 min read</div>
         </li>
       </ul>
     </section>
 
     <section class="section" id="connect">
-      <div class="section-label">Connect</div>
+      <div class="section-label"><span class="glitch-wrapper" data-text="Connect">Connect</span></div>
       <div class="link-grid">
         <a href="https://indigokarasu.com" class="link-card">This Site</a>
         <a href="https://github.com/indigokarasu/indigokarasu-site" class="link-card">Site Source</a>
@@ -505,36 +548,76 @@
   // --- scroll-driven effects ---
   const noise = document.getElementById('noiseOverlay');
   const sweep = document.getElementById('scanlineSweep');
-  let noiseTimer, sweepTimer;
+  const sweep2 = document.getElementById('scanlineSweep2');
+  let noiseTimer, sweepTimer, sweep2Timer;
   let lastScrollY = 0;
+  let scrollCount = 0;
 
   window.addEventListener('scroll', () => {
     const scrollY = window.scrollY;
     const scrollingDown = scrollY > lastScrollY;
     lastScrollY = scrollY;
+    scrollCount++;
 
     // noise overlay — active while scrolling, lingers 600ms
     noise.classList.add('active');
     clearTimeout(noiseTimer);
     noiseTimer = setTimeout(() => noise.classList.remove('active'), 600);
 
-    // scanline sweep — fires on each scroll direction change or every 400px
+    // primary scanline sweep — purple, fast, on every scroll event
     if (scrollingDown) {
       sweep.classList.remove('active');
-      void sweep.offsetWidth; // force reflow to restart animation
+      void sweep.offsetWidth;
       sweep.classList.add('active');
       clearTimeout(sweepTimer);
       sweepTimer = setTimeout(() => sweep.classList.remove('active'), 900);
+
+      // secondary scanline — cyan, slower, fires every 3rd scroll event
+      if (scrollCount % 3 === 0) {
+        sweep2.classList.remove('active');
+        void sweep2.offsetWidth;
+        sweep2.classList.add('active');
+        clearTimeout(sweep2Timer);
+        sweep2Timer = setTimeout(() => sweep2.classList.remove('active'), 1500);
+      }
     }
   }, { passive: true });
 
-  // glitch burst on .glitch-wrapper when they scroll into view
+  // random character corruption on glitch-wrapper elements
+  const glitchChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`';
+  function corruptText(el, duration) {
+    const original = el.dataset.text || el.textContent.trim();
+    const chars = original.split('');
+    const corruptCount = Math.max(1, Math.floor(chars.length * 0.3));
+    const indices = new Set();
+    while (indices.size < corruptCount) {
+      indices.add(Math.floor(Math.random() * chars.length));
+    }
+    const corrupted = chars.map((c, i) => indices.has(i) ? glitchChars[Math.floor(Math.random() * glitchChars.length)] : c).join('');
+    // Only corrupt text nodes, not the pseudo-element content
+    el.childNodes.forEach(node => {
+      if (node.nodeType === 3) node.textContent = corrupted;
+    });
+    // Restore after duration
+    setTimeout(() => {
+      el.childNodes.forEach(node => {
+        if (node.nodeType === 3) node.textContent = original;
+      });
+    }, duration);
+  }
+
+  // glitch burst + random corruption on .glitch-wrapper when they scroll into view
   const glitchObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
+    entries.forEach((entry, i) => {
       if (entry.isIntersecting) {
         const el = entry.target;
         el.classList.add('burst');
-        setTimeout(() => el.classList.remove('burst'), 1500);
+        // Staggered burst timing for elements that appear together
+        const delay = i * 200;
+        setTimeout(() => {
+          corruptText(el, 400);
+          setTimeout(() => el.classList.remove('burst'), 600);
+        }, delay);
         glitchObserver.unobserve(el);
       }
     });
@@ -559,6 +642,20 @@
   document.querySelectorAll('.card, .essay-item, .link-card').forEach(el => {
     cardObserver.observe(el);
   });
+
+  // logo glitch on page load — one strong burst then settle
+  const logoEl = document.querySelector('.logo .glitch-wrapper');
+  if (logoEl) {
+    logoEl.classList.add('burst');
+    corruptText(logoEl, 300);
+    setTimeout(() => logoEl.classList.remove('burst'), 500);
+    // Repeat occasionally
+    setInterval(() => {
+      logoEl.classList.add('burst');
+      corruptText(logoEl, 200);
+      setTimeout(() => logoEl.classList.remove('burst'), 400);
+    }, 12000);
+  }
   </script>
 </body>
 </html>
