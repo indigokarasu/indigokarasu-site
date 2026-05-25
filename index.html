@@ -437,10 +437,11 @@
     color: var(--text-dim);
   }
 
-  /* glitch text — continuous subtle on hero, burst on scroll-into-view */
+  /* glitch text — all glitch-wrappers animate continuously at different intensities */
   .glitch-wrapper {
     position: relative;
     display: inline-block;
+    cursor: default;
   }
   .glitch-wrapper::before,
   .glitch-wrapper::after {
@@ -455,31 +456,26 @@
   }
   .glitch-wrapper::before { color: #0ff; z-index: -1; }
   .glitch-wrapper::after  { color: #f0f; z-index: -1; }
-  /* subtle idle glitch on hero heading + logo */
-  .hero .glitch-wrapper::before { animation: glitch-1 4s infinite linear; opacity: 0.45; }
-  .hero .glitch-wrapper::after  { animation: glitch-2 4s infinite linear; opacity: 0.45; }
+  /* hero heading: most prominent idle glitch */
+  .hero .glitch-wrapper::before { animation: glitch-1 4s infinite linear; opacity: 0.5; }
+  .hero .glitch-wrapper::after  { animation: glitch-2 4s infinite linear; opacity: 0.5; }
+  /* logo: flicker */
   .logo .glitch-wrapper { animation: flicker 8s infinite; }
-  /* non-hero glitch: burst only on scroll-into-view */
-  .glitch-wrapper { cursor: default; }
-  .section-label .glitch-wrapper::before,
-  .section-label .glitch-wrapper::after,
-  .essay-item .glitch-wrapper::before,
-  .essay-item .glitch-wrapper::after {
-    opacity: 0;
-  }
-  /* intensified burst class (toggled by JS on scroll) */
+  .logo .glitch-wrapper::before { animation: glitch-1 6s infinite linear; opacity: 0.3; }
+  .logo .glitch-wrapper::after  { animation: glitch-2 6s infinite linear; opacity: 0.3; }
+  /* section labels: subtle constant glitch */
+  .section-label .glitch-wrapper::before { animation: glitch-1 5s infinite linear; opacity: 0.35; }
+  .section-label .glitch-wrapper::after  { animation: glitch-2 5s infinite linear; opacity: 0.35; }
+  /* essay titles: subtle, slightly faster */
+  .essay-item .glitch-wrapper::before { animation: glitch-1 7s infinite linear; opacity: 0.25; }
+  .essay-item .glitch-wrapper::after  { animation: glitch-2 7s infinite linear; opacity: 0.25; }
+  /* intensified burst class (toggled by JS) */
   .glitch-wrapper.burst::before,
   .glitch-wrapper.burst::after {
-    opacity: 0.85;
+    opacity: 0.9;
   }
   .glitch-wrapper.burst::before { animation: glitch-1 0.12s infinite; }
   .glitch-wrapper.burst::after  { animation: glitch-2 0.12s infinite; }
-  /* section label burst: cyan/magenta color shift */
-  .section-label .glitch-wrapper.burst::before { color: #0ff; }
-  .section-label .glitch-wrapper.burst::after  { color: #f0f; }
-  /* essay title burst: same */
-  .essay-item .glitch-wrapper.burst::before { color: #0ff; }
-  .essay-item .glitch-wrapper.burst::after  { color: #f0f; }
 
   /* cursor glow */
   .cursor-glow {
@@ -644,30 +640,39 @@
     }, duration);
   }
 
-  // ambient corruption: randomly corrupt small elements at random intervals
+  // ambient corruption: randomly corrupt elements at random intervals
   function ambientCorrupt() {
-    const targets = document.querySelectorAll('.date, .link-card, .section-label .glitch-wrapper, footer p');
+    // Build a pool of all corruptible targets
+    const targets = document.querySelectorAll(
+      '.date, .link-card, .section-label .glitch-wrapper, .essay-item .glitch-wrapper, footer p'
+    );
     if (!targets.length) return;
-    const el = targets[Math.floor(Math.random() * targets.length)];
-    const isLink = el.classList.contains('link-card');
-    // link cards get a class-based chroma, text gets corrupted
-    if (isLink) {
-      el.classList.add('corrupting');
-      setTimeout(() => el.classList.remove('corrupting'), 400);
+    // Pick 1-2 random targets
+    const count = 1 + Math.floor(Math.random() * 2);
+    for (let n = 0; n < count; n++) {
+      const el = targets[Math.floor(Math.random() * targets.length)];
+      const isLink = el.classList.contains('link-card');
+      const isGlitch = el.classList.contains('glitch-wrapper');
+      if (isLink) {
+        el.classList.add('corrupting');
+        setTimeout(() => el.classList.remove('corrupting'), 500);
+      }
+      const intensity = isGlitch ? 0.35 : 0.25;
+      const duration = 200 + Math.random() * 400;
+      corruptText(el, duration, intensity);
+      // heavy chroma flash
+      el.style.animation = 'none';
+      el.offsetHeight;
+      el.style.animation = 'chroma-heavy 0.3s 1';
+      setTimeout(() => { el.style.animation = ''; }, 500);
     }
-    corruptText(el, 200 + Math.random() * 300, 0.15 + Math.random() * 0.25);
-    // heavy chroma flash on the element
-    el.style.animation = 'none';
-    el.offsetHeight; // reflow
-    el.style.animation = 'chroma-heavy 0.3s 1';
-    setTimeout(() => { el.style.animation = ''; }, 400);
   }
-  // Run ambient corruption every 1.5-4 seconds
+  // Run ambient corruption every 1-3 seconds
   function scheduleAmbient() {
     setTimeout(() => {
       ambientCorrupt();
       scheduleAmbient();
-    }, 1500 + Math.random() * 2500);
+    }, 1000 + Math.random() * 2000);
   }
   scheduleAmbient();
 
