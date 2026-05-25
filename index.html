@@ -388,23 +388,6 @@
   .card .meta { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.8rem; }
   .card p { font-size: 0.9rem; color: var(--text-dim); }
 
-  /* essays */
-  .essay-list { list-style: none; }
-  .essay-item {
-    border-bottom: 1px solid var(--border);
-    padding: 1.5rem 0;
-    transition: padding-left 0.2s;
-  }
-  .essay-item:hover { padding-left: 0.5rem; }
-  .essay-item a {
-    color: var(--text);
-    text-decoration: none;
-    font-size: 1.05rem;
-    font-weight: 600;
-  }
-  .essay-item a:hover { color: var(--accent); }
-  .essay-item .date { font-size: 0.78rem; color: var(--text-dim); margin-top: 0.3rem; }
-
   /* links */
   .link-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
   .link-card {
@@ -466,9 +449,6 @@
   /* section labels: subtle constant glitch */
   .section-label .glitch-wrapper::before { animation: glitch-1 5s infinite linear; opacity: 0.35; }
   .section-label .glitch-wrapper::after  { animation: glitch-2 5s infinite linear; opacity: 0.35; }
-  /* essay titles: subtle, slightly faster */
-  .essay-item .glitch-wrapper::before { animation: glitch-1 7s infinite linear; opacity: 0.25; }
-  .essay-item .glitch-wrapper::after  { animation: glitch-2 7s infinite linear; opacity: 0.25; }
   /* intensified burst class (toggled by JS) */
   .glitch-wrapper.burst::before,
   .glitch-wrapper.burst::after {
@@ -510,7 +490,6 @@
   <header class="top-bar">
     <a href="/" class="logo"><span class="glitch-wrapper" data-text="Indigo">Indigo</span><span class="dot">.</span></a>
     <nav class="nav">
-      <a href="/#essays">Essays</a>
       <a href="/#connect">Connect</a>
     </nav>
   </header>
@@ -520,27 +499,8 @@
       <h1>I think about <span class="glitch-wrapper" data-text="systems">systems</span>, build tools, and write about software.</h1>
       <p>Focused on infrastructure, tooling, and the ideas behind good software. This site is where I share what I am working on and what I am learning.</p>
       <div class="btns">
-        <a href="/#essays" class="btn btn-primary">Read essays</a>
-        <a href="/#connect" class="btn">Get in touch</a>
+        <a href="/#connect" class="btn btn-primary">Get in touch</a>
       </div>
-    </section>
-
-    <section class="section" id="essays">
-      <div class="section-label"><span class="glitch-wrapper" data-text="Essays">Essays</span></div>
-      <ul class="essay-list">
-        <li class="essay-item">
-          <a href="/essays/invisible-infrastructure.html"><span class="glitch-wrapper" data-text="On Invisible Infrastructure">On Invisible Infrastructure</span></a>
-          <div class="date">May 2026 ~ 5 min read</div>
-        </li>
-        <li class="essay-item">
-          <a href="/essays/tools-should-disappear.html"><span class="glitch-wrapper" data-text="Tools Should Disappear">Tools Should Disappear</span></a>
-          <div class="date">May 2026 ~ 4 min read</div>
-        </li>
-        <li class="essay-item">
-          <a href="/essays/owning-your-stack.html"><span class="glitch-wrapper" data-text="Owning Your Stack">Owning Your Stack</span></a>
-          <div class="date">May 2026 ~ 4 min read</div>
-        </li>
-      </ul>
     </section>
 
     <section class="section" id="connect">
@@ -644,7 +604,7 @@
   function ambientCorrupt() {
     // Build a pool of all corruptible targets
     const targets = document.querySelectorAll(
-      '.date, .link-card, .section-label .glitch-wrapper, .essay-item .glitch-wrapper, footer p'
+      '.date, .link-card, .section-label .glitch-wrapper, footer p'
     );
     if (!targets.length) return;
     // Pick 1-2 random targets
@@ -679,7 +639,7 @@
   // --- page-load glitch: 3 random visible words get hit hard ---
   setTimeout(() => {
     const glitchChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`ÄÖÜßØÆÐŁ';
-    const textSel = 'h1, h2, h3, p, a:not(nav a), .date, .section-label, .link-card, .btn, footer p';
+    const textSel = 'h1, h2, h3, p, a:not(nav a), .section-label, .link-card, .btn, footer p';
     const candidates = [];
     document.querySelectorAll(textSel).forEach(el => {
       const rect = el.getBoundingClientRect();
@@ -829,7 +789,7 @@
     });
   }, { threshold: 0.2 });
 
-  document.querySelectorAll('.card, .essay-item').forEach(el => {
+  document.querySelectorAll('.card').forEach(el => {
     cardObserver.observe(el);
   });
 
