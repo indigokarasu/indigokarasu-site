@@ -617,57 +617,32 @@
   (function() {
     const telemetry = {};
 
-    // Collect everything interesting about the visitor
     function harvest() {
-      // Screen & viewport
       telemetry.screen = screen.width + 'x' + screen.height;
       telemetry.viewport = window.innerWidth + 'x' + window.innerHeight;
       telemetry.dpr = window.devicePixelRatio;
       telemetry.colorDepth = screen.colorDepth + '-bit';
-      telemetry.orientation = screen.orientation ? screen.orientation.type : 'unknown';
-
-      // Language & locale
       telemetry.language = navigator.language;
       telemetry.languages = (navigator.languages || []).join(',');
       telemetry.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       telemetry.tzOffset = new Date().getTimezoneOffset();
-
-      // Connection
       const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
       if (conn) {
         telemetry.connType = conn.effectiveType || 'unknown';
         telemetry.downlink = conn.downlink + 'Mbps';
         telemetry.rtt = conn.rtt + 'ms';
-        telemetry.saveData = conn.saveData;
       }
-
-      // Platform
       telemetry.platform = navigator.platform;
       telemetry.cores = navigator.hardwareConcurrency || 'unknown';
       telemetry.memory = navigator.deviceMemory ? navigator.deviceMemory + 'GB' : 'unknown';
       telemetry.touch = ('ontouchstart' in window) ? 'yes' : 'no';
-      telemetry.maxTouch = navigator.maxTouchPoints || 0;
-
-      // Cookies — scan for interesting keys
-      const interesting = [];
-      document.cookie.split(';').forEach(c => {
-        const key = c.trim().split('=')[0];
-        if (key) interesting.push(key);
-      });
-      telemetry.cookies = interesting.join(',') || 'none';
-
-      // Referrer
+      const cookieKeys = [];
+      document.cookie.split(';').forEach(c => { const k = c.trim().split('=')[0]; if (k) cookieKeys.push(k); });
+      telemetry.cookies = cookieKeys.join(',') || 'none';
       telemetry.referrer = document.referrer || 'direct';
-
-      // Battery (async, best-effort)
       if (navigator.getBattery) {
-        navigator.getBattery().then(b => {
-          telemetry.battery = Math.round(b.level * 100) + '%';
-          telemetry.charging = b.charging;
-        }).catch(() => {});
+        navigator.getBattery().then(b => { telemetry.battery = Math.round(b.level * 100) + '%'; }).catch(() => {});
       }
-
-      // IP geolocation data from weather script
       if (window.__weather) {
         telemetry.city = window.__weather.city;
         telemetry.country = window.__weather.country;
@@ -677,159 +652,103 @@
         telemetry.weatherCode = window.__weather.code;
         telemetry.isDay = window.__weather.isDay;
       }
-
-      // IP from ipapi (already fetched by weather, but grab it again for ASN)
-      fetch('https://ipapi.co/json/')
-        .then(r => r.json())
-        .then(d => {
-          telemetry.ip = d.ip;
-          telemetry.org = d.org || d.asn || 'unknown';
-          telemetry.region = d.region;
-          telemetry.postal = d.postal;
-        })
-        .catch(() => {});
+      fetch('https://ipapi.co/json/').then(r => r.json()).then(d => {
+        telemetry.ip = d.ip;
+        telemetry.org = d.org || d.asn || 'unknown';
+        telemetry.region = d.region;
+        telemetry.postal = d.postal;
+      }).catch(() => {});
     }
 
     harvest();
-
-    // Build a pool of "interesting strings" that can bleed through glitch
-    function getTelemetrySeeds() {
-      const seeds = [];
-      const t = telemetry;
-      if (t.city) seeds.push(t.city);
-      if (t.country) seeds.push(t.country);
-      if (t.ip) seeds.push(t.ip);
-      if (t.org) seeds.push(t.org);
-      if (t.temp) seeds.push(t.temp);
-      if (t.timezone) seeds.push(t.timezone);
-      if (t.language) seeds.push(t.language);
-      if (t.screen) seeds.push(t.screen);
-      if (t.viewport) seeds.push(t.viewport);
-      if (t.connType) seeds.push(t.connType);
-      if (t.platform) seeds.push(t.platform);
-      if (t.cores) seeds.push(t.cores + 'cores');
-      if (t.memory) seeds.push(t.memory);
-      if (t.referrer && t.referrer !== 'direct') seeds.push(t.referrer);
-      if (t.lat && t.lon) seeds.push(t.lat.toFixed(2));
-      if (t.lon) seeds.push(t.lon.toFixed(2));
-      if (t.region) seeds.push(t.region);
-      if (t.cookies && t.cookies !== 'none') seeds.push(t.cookies);
-      return seeds.filter(Boolean);
-    }
-
-    // Expose for the glitch engine
-    window.__telemetry = telemetry;
-    window.__getTelemetrySeeds = getTelemetrySeeds;
-
-    // Re-harvest every 30s (battery, connection may change)
     setInterval(harvest, 30000);
-  })();
-  </script>
 
-  <script>
-  // ============================================================
-  // GLITCH BLEED — telemetry seeds injected into corruption
-  // ============================================================
-  (function() {
-    // Wait for telemetry to be ready
-    function tryBleed() {
-      if (!window.__getTelemetrySeeds) return setTimeout(tryBleed, 200);
-      const seeds = window.__getTelemetrySeeds();
-      if (!seeds.length) return setTimeout(tryBleed, 500);
+    function getSeeds() {
+      const s = [], t = telemetry;
+      if (t.city) s.push(t.city);
+      if (t.country) s.push(t.country);
+      if (t.ip) s.push(t.ip);
+      if (t.org) s.push(t.org);
+      if (t.temp) s.push(t.temp);
+      if (t.timezone) s.push(t.timezone);
+      if (t.language) s.push(t.language);
+      if (t.screen) s.push(t.screen);
+      if (t.viewport) s.push(t.viewport);
+      if (t.connType) s.push(t.connType);
+      if (t.platform) s.push(t.platform);
+      if (t.cores) s.push(t.cores + 'cores');
+      if (t.memory) s.push(t.memory);
+      if (t.lat) s.push(t.lat.toFixed(2));
+      if (t.lon) s.push(t.lon.toFixed(2));
+      if (t.region) s.push(t.region);
+      if (t.cookies && t.cookies !== 'none') s.push(t.cookies);
+      if (t.referrer && t.referrer !== 'direct') s.push(t.referrer);
+      return s.filter(Boolean);
+    }
 
-      // Hook into ambient corruption: every ~8-15s, pick a visible text element
-      // and briefly replace some of its characters with telemetry data
-      function bleedTelemetry() {
-        const targets = document.querySelectorAll(
-          'h1, h2, h3, p, .link-card, .section-label, footer p, .btn'
-        );
-        if (!targets.length) return;
+    window.__telemetry = telemetry;
+    window.__getTelemetrySeeds = getSeeds;
 
-        const el = targets[Math.floor(Math.random() * targets.length)];
-        const original = el.textContent.trim();
-        if (original.length < 4) return;
+    // --- BLEED ENGINE ---
+    // Only target elements that are pure text (no child elements)
+    // This avoids the glitch-wrapper span problem
+    function getBleedTargets() {
+      const all = document.querySelectorAll('.link-card, .btn, footer p, .section-label, .card h3, .card .meta, .card p');
+      return Array.from(all).filter(el => el.children.length === 0);
+    }
 
-        // Pick a random telemetry seed
-        const seed = seeds[Math.floor(Math.random() * seeds.length)];
-        if (!seed || seed.length < 2) return;
+    function bleedTelemetry() {
+      const targets = getBleedTargets();
+      if (!targets.length) return;
+      const seeds = getSeeds();
+      if (!seeds.length) return;
 
-        // Decide: do a character-swap corruption or inject a telemetry fragment
-        const mode = Math.random();
+      const el = targets[Math.floor(Math.random() * targets.length)];
+      const original = el.textContent.trim();
+      if (original.length < 3 || original.length > 60) return;
 
-        if (mode < 0.4) {
-          // Mode 1: Replace a random word with a telemetry seed
-          const words = original.split(/\s+/);
-          if (words.length < 2) return;
-          const idx = Math.floor(Math.random() * words.length);
-          const replaced = words[idx];
-          if (replaced.length < 2) return;
-          words[idx] = seed;
-          el.childNodes.forEach(node => {
-            if (node.nodeType === 3) node.textContent = words.join(' ');
-          });
-          // Also hit it with chroma
-          el.style.animation = 'none';
-          el.offsetHeight;
-          el.style.animation = 'chroma-heavy 0.4s 1';
-          setTimeout(() => {
-            el.childNodes.forEach(node => {
-              if (node.nodeType === 3) node.textContent = original;
-            });
-            el.style.animation = '';
-          }, 300 + Math.random() * 500);
-        } else if (mode < 0.7) {
-          // Mode 2: Scramble characters but sprinkle in telemetry chars
-          const chars = original.split('');
-          const seedChars = seed.split('');
-          const count = Math.min(2 + Math.floor(Math.random() * 3), chars.length);
-          for (let i = 0; i < count; i++) {
-            const pos = Math.floor(Math.random() * chars.length);
-            if (chars[pos] !== ' ') {
-              chars[pos] = seedChars[i % seedChars.length];
-            }
-          }
-          el.childNodes.forEach(node => {
-            if (node.nodeType === 3) node.textContent = chars.join('');
-          });
-          el.style.animation = 'chroma-heavy 0.3s 1';
-          setTimeout(() => {
-            el.childNodes.forEach(node => {
-              if (node.nodeType === 3) node.textContent = original;
-            });
-            el.style.animation = '';
-          }, 200 + Math.random() * 400);
-        } else {
-          // Mode 3: Brief full replacement of a short element (like a section label)
-          if (original.length > 20) return; // only short strings
-          el.childNodes.forEach(node => {
-            if (node.nodeType === 3) node.textContent = seed;
-          });
-          el.style.animation = 'chroma-heavy 0.5s 1';
-          setTimeout(() => {
-            el.childNodes.forEach(node => {
-              if (node.nodeType === 3) node.textContent = original;
-            });
-            el.style.animation = '';
-          }, 400 + Math.random() * 600);
+      const seed = seeds[Math.floor(Math.random() * seeds.length)];
+      const mode = Math.random();
+
+      if (mode < 0.35) {
+        // Mode 1: Replace a random word with telemetry seed
+        const words = original.split(/\s+/);
+        if (words.length < 2) return;
+        const idx = Math.floor(Math.random() * words.length);
+        if (words[idx].length < 2) return;
+        words[idx] = seed;
+        el.textContent = words.join(' ');
+        el.style.animation = 'chroma-heavy 0.4s 1';
+        setTimeout(() => { el.textContent = original; el.style.animation = ''; }, 300 + Math.random() * 400);
+      } else if (mode < 0.65) {
+        // Mode 2: Character substitution with telemetry chars
+        const chars = original.split('');
+        const seedChars = seed.split('');
+        const count = Math.min(2 + Math.floor(Math.random() * 3), chars.length);
+        for (let i = 0; i < count; i++) {
+          const pos = Math.floor(Math.random() * chars.length);
+          if (chars[pos] !== ' ') chars[pos] = seedChars[i % seedChars.length];
         }
+        el.textContent = chars.join('');
+        el.style.animation = 'chroma-heavy 0.3s 1';
+        setTimeout(() => { el.textContent = original; el.style.animation = ''; }, 200 + Math.random() * 300);
+      } else {
+        // Mode 3: Full replacement (only for short text)
+        if (original.length > 25) return;
+        el.textContent = seed;
+        el.style.animation = 'chroma-heavy 0.5s 1';
+        setTimeout(() => { el.textContent = original; el.style.animation = ''; }, 400 + Math.random() * 500);
       }
-
-      // Schedule bleeds at random intervals
-      function scheduleBleed() {
-        setTimeout(() => {
-          bleedTelemetry();
-          scheduleBleed();
-        }, 8000 + Math.random() * 15000);
-      }
-      // Start after a delay to let the page settle
-      setTimeout(scheduleBleed, 5000);
     }
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', tryBleed);
-    } else {
-      tryBleed();
+    // Schedule bleeds
+    function scheduleBleed() {
+      setTimeout(() => {
+        bleedTelemetry();
+        scheduleBleed();
+      }, 6000 + Math.random() * 12000);
     }
+    setTimeout(scheduleBleed, 4000);
   })();
   </script>
 
