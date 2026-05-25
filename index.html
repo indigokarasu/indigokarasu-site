@@ -116,6 +116,15 @@
     0% { transform: translateY(-100%); }
     100% { transform: translateY(100vh); }
   }
+  @keyframes scanline-sweep {
+    0%   { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  @keyframes card-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(123,97,255,0); }
+    40%  { box-shadow: 0 0 35px 2px rgba(123,97,255,0.18); }
+    100% { box-shadow: 0 0 0 0 rgba(123,97,255,0); }
+  }
   @keyframes flicker {
     0%, 100% { opacity: 1; }
     92% { opacity: 1; }
@@ -182,23 +191,37 @@
     margin: 0 auto;
     position: relative;
   }
-  .hero::before {
-    content: '';
+  /* scanline static + sweep on scroll */
+  .scanline-static {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     pointer-events: none;
+    z-index: 999;
     background: repeating-linear-gradient(
       0deg,
       transparent,
       transparent 2px,
-      rgba(123,97,255,0.015) 2px,
-      rgba(123,97,255,0.015) 4px
+      rgba(123,97,255,0.025) 2px,
+      rgba(123,97,255,0.025) 4px
     );
-    z-index: 999;
   }
+  .scanline-sweep {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    pointer-events: none;
+    z-index: 1000;
+    background: rgba(123,97,255,0.18);
+    box-shadow: 0 0 14px 4px rgba(123,97,255,0.12);
+    opacity: 0;
+  }
+  .scanline-sweep.active {
+    opacity: 1;
+    animation: scanline-sweep 0.8s linear forwards;
+  }
+
+  /* card pulse class (toggled by JS on scroll) */
+  .card-pulse { animation: card-pulse 0.8s ease-out; }
   .hero h1 {
     font-size: clamp(1.8rem, 4vw, 3rem);
     font-weight: 400;
@@ -211,27 +234,6 @@
     position: relative;
     display: inline-block;
   }
-  .hero h1 .glitch-wrapper::before,
-  .hero h1 .glitch-wrapper::after {
-    content: attr(data-text);
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-  }
-  .hero h1 .glitch-wrapper::before {
-    color: #0ff;
-    animation: glitch-1 3s infinite linear;
-    opacity: 0.6;
-    z-index: -1;
-  }
-  .hero h1 .glitch-wrapper::after {
-    color: #ff00ff;
-    animation: glitch-2 3s infinite linear;
-    opacity: 0.6;
-    z-index: -2;
-  }
   .hero p {
     font-size: 1.05rem;
     color: var(--text-dim);
@@ -239,7 +241,7 @@
     margin-bottom: 2.5rem;
   }
 
-  /* noise trigger on scroll */
+  /* noise overlay — triggers on scroll, stronger on mobile */
   .noise-overlay {
     position: fixed;
     top: 0;
@@ -249,11 +251,11 @@
     pointer-events: none;
     z-index: 998;
     opacity: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E");
     background-size: 256px 256px;
-    transition: opacity 0.3s;
+    transition: opacity 0.2s;
   }
-  .noise-overlay.active { opacity: 1; animation: noise 0.5s steps(10) infinite; }
+  .noise-overlay.active { opacity: 1; animation: noise 0.4s steps(8) infinite; }
 
   /* buttons */
   .btns { display: flex; gap: 1rem; }
@@ -382,30 +384,34 @@
     color: var(--text-dim);
   }
 
-  /* glitch text utility */
-  .glitch-text {
+  /* glitch text — continuous subtle on hero, burst on scroll-into-view */
+  .glitch-wrapper {
     position: relative;
+    display: inline-block;
   }
-  .glitch-text::before,
-  .glitch-text::after {
+  .glitch-wrapper::before,
+  .glitch-wrapper::after {
     content: attr(data-text);
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
+    pointer-events: none;
     opacity: 0;
   }
-  .glitch-text:hover::before {
-    color: #0ff;
-    animation: glitch-1 0.3s infinite;
-    opacity: 0.5;
+  .glitch-wrapper::before { color: #0ff; z-index: -1; }
+  .glitch-wrapper::after  { color: #f0f; z-index: -1; }
+  /* subtle idle glitch on hero heading */
+  .hero .glitch-wrapper::before { animation: glitch-1 4s infinite linear; opacity: 0.45; }
+  .hero .glitch-wrapper::after  { animation: glitch-2 4s infinite linear; opacity: 0.45; }
+  /* intensified burst class (toggled by JS on scroll) */
+  .glitch-wrapper.burst::before,
+  .glitch-wrapper.burst::after {
+    opacity: 0.8;
   }
-  .glitch-text:hover::after {
-    color: #f0f;
-    animation: glitch-2 0.3s infinite;
-    opacity: 0.5;
-  }
+  .glitch-wrapper.burst::before { animation: glitch-1 0.15s infinite; }
+  .glitch-wrapper.burst::after  { animation: glitch-2 0.15s infinite; }
 
   /* cursor glow */
   .cursor-glow {
@@ -433,6 +439,8 @@
 <body>
   <div class="cursor-glow" id="cursorGlow"></div>
   <div class="noise-overlay" id="noiseOverlay"></div>
+  <div class="scanline-static"></div>
+  <div class="scanline-sweep" id="scanlineSweep"></div>
 
   <header class="top-bar">
     <a href="/" class="logo">Indigo<span class="dot">.</span></a>
@@ -487,26 +495,69 @@
   </footer>
 
   <script>
-  // cursor glow
+  // cursor glow (desktop only)
   const glow = document.getElementById('cursorGlow');
   document.addEventListener('mousemove', e => {
     glow.style.left = e.clientX + 'px';
     glow.style.top = e.clientY + 'px';
   });
 
-  // noise overlay on scroll
+  // --- scroll-driven effects ---
   const noise = document.getElementById('noiseOverlay');
-  let noiseTimer;
+  const sweep = document.getElementById('scanlineSweep');
+  let noiseTimer, sweepTimer;
+  let lastScrollY = 0;
+
   window.addEventListener('scroll', () => {
+    const scrollY = window.scrollY;
+    const scrollingDown = scrollY > lastScrollY;
+    lastScrollY = scrollY;
+
+    // noise overlay — active while scrolling, lingers 600ms
     noise.classList.add('active');
     clearTimeout(noiseTimer);
-    noiseTimer = setTimeout(() => noise.classList.remove('active'), 300);
+    noiseTimer = setTimeout(() => noise.classList.remove('active'), 600);
+
+    // scanline sweep — fires on each scroll direction change or every 400px
+    if (scrollingDown) {
+      sweep.classList.remove('active');
+      void sweep.offsetWidth; // force reflow to restart animation
+      sweep.classList.add('active');
+      clearTimeout(sweepTimer);
+      sweepTimer = setTimeout(() => sweep.classList.remove('active'), 900);
+    }
+  }, { passive: true });
+
+  // glitch burst on .glitch-wrapper when they scroll into view
+  const glitchObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        el.classList.add('burst');
+        setTimeout(() => el.classList.remove('burst'), 1500);
+        glitchObserver.unobserve(el);
+      }
+    });
+  }, { threshold: 0.3 });
+
+  document.querySelectorAll('.glitch-wrapper').forEach(el => {
+    el.setAttribute('data-text', el.textContent.trim());
+    glitchObserver.observe(el);
   });
 
-  // glitch text on hover
-  document.querySelectorAll('.glitch-wrapper').forEach(el => {
-    el.classList.add('glitch-text');
-    el.setAttribute('data-text', el.textContent);
+  // card pulse on scroll into view
+  const cardObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('card-pulse');
+        setTimeout(() => entry.target.classList.remove('card-pulse'), 900);
+        cardObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.2 });
+
+  document.querySelectorAll('.card, .essay-item, .link-card').forEach(el => {
+    cardObserver.observe(el);
   });
   </script>
 </body>
