@@ -693,8 +693,12 @@
     // Only target elements that are pure text (no child elements)
     // This avoids the glitch-wrapper span problem
     function getBleedTargets() {
-      const all = document.querySelectorAll('.link-card, .btn, footer p, .section-label, .card h3, .card .meta, .card p');
-      return Array.from(all).filter(el => el.children.length === 0);
+      const all = document.querySelectorAll('.link-card, .btn, footer p, .glitch-wrapper, .nav a, .card h3, .card .meta, .card p, .hero p, .about p');
+      return Array.from(all).filter(el => {
+        // Allow glitch-wrapper (it has data-text, no element children)
+        if (el.classList.contains('glitch-wrapper')) return true;
+        return el.children.length === 0;
+      });
     }
 
     function bleedTelemetry() {
@@ -705,23 +709,28 @@
 
       const el = targets[Math.floor(Math.random() * targets.length)];
       const original = el.textContent.trim();
-      if (original.length < 3 || original.length > 60) return;
+      if (original.length < 3) return;
 
       const seed = seeds[Math.floor(Math.random() * seeds.length)];
       const mode = Math.random();
 
-      if (mode < 0.35) {
-        // Mode 1: Replace a random word with telemetry seed
-        const words = original.split(/\s+/);
-        if (words.length < 2) return;
-        const idx = Math.floor(Math.random() * words.length);
-        if (words[idx].length < 2) return;
-        words[idx] = seed;
-        el.textContent = words.join(' ');
-        el.style.animation = 'chroma-heavy 0.4s 1';
-        setTimeout(() => { el.textContent = original; el.style.animation = ''; }, 300 + Math.random() * 400);
-      } else if (mode < 0.65) {
-        // Mode 2: Character substitution with telemetry chars
+      if (mode < 0.5) {
+        // Mode 1: Replace entire text with telemetry seed (most visible)
+        if (original.length > 30) {
+          // For longer text, replace just one word
+          const words = original.split(/\s+/);
+          if (words.length < 2) return;
+          const idx = Math.floor(Math.random() * words.length);
+          words[idx] = '[' + seed + ']';
+          el.textContent = words.join(' ');
+        } else {
+          el.textContent = seed;
+        }
+        el.style.animation = 'chroma-heavy 0.5s 1';
+        el.style.color = 'var(--accent)';
+        setTimeout(() => { el.textContent = original; el.style.animation = ''; el.style.color = ''; }, 500 + Math.random() * 600);
+      } else if (mode < 0.8) {
+        // Mode 2: Inject telemetry chars into existing text
         const chars = original.split('');
         const seedChars = seed.split('');
         const count = Math.min(2 + Math.floor(Math.random() * 3), chars.length);
@@ -731,24 +740,32 @@
         }
         el.textContent = chars.join('');
         el.style.animation = 'chroma-heavy 0.3s 1';
-        setTimeout(() => { el.textContent = original; el.style.animation = ''; }, 200 + Math.random() * 300);
+        setTimeout(() => { el.textContent = original; el.style.animation = ''; }, 300 + Math.random() * 400);
       } else {
-        // Mode 3: Full replacement (only for short text)
-        if (original.length > 25) return;
-        el.textContent = seed;
-        el.style.animation = 'chroma-heavy 0.5s 1';
-        setTimeout(() => { el.textContent = original; el.style.animation = ''; }, 400 + Math.random() * 500);
+        // Mode 3: Append telemetry fragment briefly
+        el.textContent = original + ' ⊳ ' + seed;
+        el.style.animation = 'chroma-heavy 0.4s 1';
+        el.style.color = 'var(--accent)';
+        setTimeout(() => { el.textContent = original; el.style.animation = ''; el.style.color = ''; }, 600 + Math.random() * 500);
       }
     }
 
-    // Schedule bleeds
+    // Schedule bleeds — wait for telemetry data to arrive
     function scheduleBleed() {
       setTimeout(() => {
-        bleedTelemetry();
+        const seeds = getSeeds();
+        if (seeds.length > 0) {
+          bleedTelemetry();
+        } else {
+          // Data not ready yet, retry sooner
+          setTimeout(scheduleBleed, 1500);
+          return;
+        }
         scheduleBleed();
-      }, 6000 + Math.random() * 12000);
+      }, 4000 + Math.random() * 8000);
     }
-    setTimeout(scheduleBleed, 4000);
+    // Start after initial data collection (weather + ipapi both need ~2s)
+    setTimeout(scheduleBleed, 3000);
   })();
   </script>
 
