@@ -676,6 +676,93 @@
   }
   scheduleAmbient();
 
+  // --- page-load glitch: 3 random visible words get hit hard ---
+  setTimeout(() => {
+    const glitchChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`ÄÖÜßØÆÐŁ';
+    const textSel = 'h1, h2, h3, p, a:not(nav a), .date, .section-label, .link-card, .btn, footer p';
+    const candidates = [];
+    document.querySelectorAll(textSel).forEach(el => {
+      const rect = el.getBoundingClientRect();
+      if (rect.top > window.innerHeight || rect.bottom < 0) return;
+      if (rect.width === 0 || rect.height === 0) return;
+      // walk text nodes and extract individual words
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+      let tnode;
+      while ((tnode = walker.nextNode())) {
+        const txt = tnode.textContent;
+        if (!txt || txt.trim().length < 2) continue;
+        if (tnode.parentNode.closest('script, style, noscript')) continue;
+        if (tnode.parentNode.classList && tnode.parentNode.classList.contains('glitch-wrapper')) continue;
+        // split into words with positions
+        const words = [];
+        const regex = /\S+/g;
+        let m;
+        while ((m = regex.exec(txt)) !== null) {
+          if (m[0].length < 2) continue;
+          words.push({ word: m[0], start: m.index, end: m.index + m[0].length });
+        }
+        words.forEach(w => {
+          candidates.push({ node: tnode, text: txt, word: w.word, start: w.start, end: w.end, parent: tnode.parentNode, hostEl: el });
+        });
+      }
+    });
+
+    // pick 3 words from different host elements AND different text nodes
+    const picked = [];
+    const usedHosts = new Set();
+    const usedNodes = new Set();
+    for (let attempt = 0; attempt < candidates.length * 3 && picked.length < 3; attempt++) {
+      const c = candidates[Math.floor(Math.random() * candidates.length)];
+      if (!c) break;
+      if (usedHosts.has(c.hostEl) && picked.length < 2) continue;
+      if (usedNodes.has(c.node)) continue;
+      usedHosts.add(c.hostEl);
+      usedNodes.add(c.node);
+      picked.push(c);
+    }
+
+    // glitch each word: split the text node, wrap the word, burst
+    picked.forEach((w, i) => {
+      // split text node at word boundaries into [before][word][after]
+      const before = w.node.textContent.slice(0, w.start);
+      const after = w.node.textContent.slice(w.end);
+      const span = document.createElement('span');
+      span.className = 'glitch-wrapper pageload-hit';
+      span.dataset.text = w.word;
+      span.textContent = w.word;
+      // force inline-block for proper dimensions
+      span.style.cssText = 'position:relative;display:inline-block;';
+      const beforeNode = document.createTextNode(before);
+      const afterNode = document.createTextNode(after);
+      const frag = document.createDocumentFragment();
+      if (before) frag.appendChild(beforeNode);
+      frag.appendChild(span);
+      if (after) frag.appendChild(afterNode);
+      w.node.replaceWith(frag);
+
+      // staggered burst
+      setTimeout(() => {
+        span.classList.add('burst');
+        const chars = w.word.split('');
+        const corruptCount = Math.max(1, Math.floor(chars.length * (0.5 + Math.random() * 0.35)));
+        const indices = new Set();
+        while (indices.size < corruptCount) {
+          const idx = Math.floor(Math.random() * chars.length);
+          if (chars[idx] !== ' ') indices.add(idx);
+        }
+        const corrupted = chars.map((c, ci) => indices.has(ci) ? glitchChars[Math.floor(Math.random() * glitchChars.length)] : c).join('');
+        span.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = corrupted; });
+        const dur = 600 + Math.random() * 800;
+        setTimeout(() => {
+          span.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = w.word; });
+          span.classList.remove('burst');
+          span.style.animation = '';
+        }, dur);
+        span.style.animation = 'chroma-heavy 0.5s 1';
+      }, 400 + i * 600);
+    });
+  }, 200);
+
   // glitch burst + corruption on .glitch-wrapper scroll into view
   const glitchObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry, i) => {
