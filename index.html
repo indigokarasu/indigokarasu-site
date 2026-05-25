@@ -480,11 +480,12 @@
     font-family: 'Courier New', 'Consolas', monospace;
     font-size: 0.7rem; line-height: 1.6;
     padding: 1rem;
-    overflow-y: auto;
+    overflow-y: hidden;
     display: flex; flex-direction: column;
+    user-select: none;
   }
   #syslog .syslog-header {
-    position: sticky; top: 0;
+    position: sticky; top: 0; flex-shrink: 0;
     display: flex; justify-content: space-between; align-items: center;
     padding-bottom: 0.5rem; margin-bottom: 0.5rem;
     border-bottom: 1px solid var(--border);
@@ -492,13 +493,30 @@
     letter-spacing: 0.1em; text-transform: uppercase;
     background: rgba(0,0,0,0.9);
   }
-  #syslog .syslog-entry {
-    color: var(--text-dim); border-bottom: 1px solid rgba(255,255,255,0.03);
+  #syslog-entries { flex: 1; overflow: hidden; position: relative; }
+  .syslog-entry {
+    color: var(--text-dim);
+    border-bottom: 1px solid rgba(255,255,255,0.03);
     padding: 0.3rem 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  #syslog .syslog-entry .time { color: var(--text-dim); opacity: 0.5; margin-right: 0.5rem; }
-  #syslog .syslog-entry .repo { color: var(--accent); }
-  #syslog .syslog-entry .msg { color: var(--text); }
+  .syslog-entry .time { color: var(--text-dim); opacity: 0.5; margin-right: 0.5rem; }
+  .syslog-entry .repo {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .syslog-entry .repo:hover { text-decoration: underline; }
+  .syslog-entry .msg { color: var(--text); }
+  .syslog-entry.typing .msg::after {
+    content: '█';
+    animation: blink 0.7s step-end infinite;
+    color: var(--accent);
+    margin-left: 1px;
+  }
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+  .syslog-entry.typing { opacity: 1; }
+  .syslog-entry.fading { opacity: 0; transition: opacity 0.5s ease-out; }
   #syslog-toggle { display: none; }
 
   /* main content area — leave room for syslog column on desktop */
@@ -763,48 +781,112 @@
 
   <script>
   // ============================================================
-  // GITHUB ACTIVITY FEED
+  // GITHUB ACTIVITY FEED — perpetual loop with typing animation
   // ============================================================
   (async function loadGitHubFeed() {
-    const entries = document.getElementById('syslog-entries');
+    const entriesEl = document.getElementById('syslog-entries');
     const statusEl = document.getElementById('syslog-status');
-    function addEntry(time, repo, msg) {
+    const MAX_ENTRIES = 12;
+    let allEvents = [];
+    let eventIndex = 0;
+    let isRunning = false;
+
+    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function typeEntry(evt, index) {
       const d = document.createElement('div');
-      d.className = 'syslog-entry';
-      const t = new Date(time);
+      d.className = 'syslog-entry typing';
+      const t = new Date(evt.created_at);
       const ts = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
-      d.innerHTML = `<span class="time">${ts}</span><span class="repo">${repo}</span> <span class="msg">${msg}</span>`;
-      entries.prepend(d);
-      while (entries.children.length > 50) entries.removeChild(entries.lastChild);
-    }
-    try {
-      const evts = await fetch('https://api.github.com/users/indigokarasu/events?per_page=30').then(r => r.json());
-      if (!Array.isArray(evts)) throw new Error('rate limited');
-      statusEl.textContent = `✓ ${evts.length} events`;
-      statusEl.style.color = 'var(--accent)';
-      const map = {
-        PushEvent: e => `push → ${e.payload?.commits?.length||0} commit${(e.payload?.commits?.length||0)!==1?'s':''}${e.payload?.commits?.[0]?.message?' └ '+e.payload.commits[0].message.split('\n')[0]:''}`,
-        CreateEvent: e => `create ${e.payload?.ref_type||'ref'}${e.payload?.ref?': '+e.payload.ref:''}`,
-        IssuesEvent: e => `${e.payload?.action} issue #${e.payload?.issue?.number}`,
-        PullRequestEvent: e => `${e.payload?.action} PR #${e.payload?.pull_request?.number}`,
-        IssueCommentEvent: e => `comment on #${e.payload?.issue?.number}`,
-        WatchEvent: e => 'starred ★',
-        ForkEvent: e => 'forked ⑂',
-        ReleaseEvent: e => `released ${e.payload?.release?.tag_name||''}`,
-      };
-      let n = 0;
-      for (const e of evts) {
-        if (!map[e.type]) continue;
-        const repo = e.repo?.name?.replace('indigokarasu/','./')||'?';
-        addEntry(e.created_at, repo, map[e.type](e));
-        if (++n >= 15) break;
+      const repoUrl = `https://github.com/${esc(evt.repo?.name || '?'})`;
+      const repoName = esc(evt.repo?.name?.replace('indigokarasu/','./') || '?');
+      d.innerHTML = `<span class="time">${ts}</span> <a class="repo" href="${repoUrl}" target="_blank" rel="noopener">${repoName}</a> <span class="msg"></span>`;
+      const msgEl = d.querySelector('.msg');
+      entriesEl.prepend(d);
+
+      // Type the message character by character
+      const fullMsg = index !== undefined ? formatEvent(evt) : (evt._formatted || '');
+      let charIdx = 0;
+      const typeInterval = setInterval(() => {
+        charIdx++;
+        msgEl.textContent = fullMsg.slice(0, charIdx);
+        if (charIdx >= fullMsg.length) {
+          clearInterval(typeInterval);
+          d.classList.remove('typing');
+        }
+      }, 18 + Math.random() * 22);
+
+      // Expire old entries: fade then remove
+      const allEntries = entriesEl.querySelectorAll('.syslog-entry');
+      if (allEntries.length > MAX_ENTRIES) {
+        const oldest = allEntries[allEntries.length - 1];
+        oldest.classList.add('fading');
+        setTimeout(() => { if (oldest.parentNode) oldest.remove(); }, 600);
       }
-      setTimeout(loadGitHubFeed, 60000);
-    } catch(e) {
-      statusEl.textContent = '✗ offline';
-      statusEl.style.color = '#f44';
-      addEntry(new Date().toISOString(), 'system', 'rate-limited — retrying in 30s');
-      setTimeout(loadGitHubFeed, 30000);
+    }
+
+    function formatEvent(e) {
+      const map = {
+        PushEvent: x => `push → ${x.payload?.commits?.length||0} commit${(x.payload?.commits?.length||0)!==1?'s':''}${x.payload?.commits?.[0]?.message?' └ '+x.payload.commits[0].message.split('\n')[0]:''}`,
+        CreateEvent: x => `create ${x.payload?.ref_type||'ref'}${x.payload?.ref?': '+x.payload.ref:''}`,
+        IssuesEvent: x => `${x.payload?.action} issue #${x.payload?.issue?.number}`,
+        PullRequestEvent: x => `${x.payload?.action} PR #${x.payload?.pull_request?.number}`,
+        IssueCommentEvent: x => `comment on #${x.payload?.issue?.number}`,
+        WatchEvent: x => 'starred ★',
+        ForkEvent: x => 'forked ⑂',
+        ReleaseEvent: x => `released ${x.payload?.release?.tag_name||''}`,
+      };
+      return (map[e.type] && map[e.type](e)) || e.type;
+    }
+
+    async function fetchEvents() {
+      try {
+        const evts = await fetch('https://api.github.com/users/indigokarasu/events?per_page=30').then(r => r.json());
+        if (!Array.isArray(evts)) throw new Error('rate limited');
+        statusEl.textContent = `✓ ${evts.length} events`;
+        statusEl.style.color = 'var(--accent)';
+        // Pre-format all messages
+        allEvents = evts.filter(e => formatEvent(e)).map(e => { e._formatted = formatEvent(e); return e; });
+        eventIndex = 0;
+        return true;
+      } catch(e) {
+        statusEl.textContent = '✗ offline';
+        statusEl.style.color = '#f44';
+        return false;
+      }
+    }
+
+    async function cycle() {
+      if (!isRunning) return;
+      if (allEvents.length === 0) {
+        await fetchEvents();
+      }
+      if (allEvents.length > 0) {
+        const evt = allEvents[eventIndex % allEvents.length];
+        typeEntry(evt);
+        eventIndex++;
+        // When we've gone through all events once, refresh
+        if (eventIndex >= allEvents.length) {
+          eventIndex = 0;
+          setTimeout(fetchEvents, 120000); // refresh every 2 min
+        }
+      }
+      // Next entry in 4-8 seconds
+      setTimeout(cycle, 4000 + Math.random() * 4000);
+    }
+
+    if (await fetchEvents()) {
+      isRunning = true;
+      // Start the loop with a staggered first few entries
+      for (let i = 0; i < Math.min(3, allEvents.length); i++) {
+        const evt = allEvents[i];
+        typeEntry(evt, i);
+        eventIndex = i + 1;
+        // Brief delay between initial entries
+        await new Promise(r => setTimeout(r, 800));
+      }
+      // Continue the perpetual loop
+      setTimeout(cycle, 5000);
     }
   })();
   </script>
