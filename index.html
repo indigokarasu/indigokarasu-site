@@ -793,7 +793,16 @@
 
     function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-    function typeEntry(evt) {
+    function trim() {
+      const all = entriesEl.querySelectorAll('.syslog-entry');
+      if (all.length > MAX_ENTRIES) {
+        const oldest = all[all.length - 1];
+        oldest.classList.add('fading');
+        setTimeout(() => { if (oldest.parentNode) oldest.remove(); }, 600);
+      }
+    }
+
+    function typeEntry(evt, instant) {
       const d = document.createElement('div');
       d.className = 'syslog-entry typing';
       const t = new Date(evt.time);
@@ -805,25 +814,22 @@
       const msgEl = d.querySelector('.msg');
       entriesEl.prepend(d);
 
-      const fullMsg = msg;
+      if (instant) {
+        msgEl.textContent = msg;
+        d.classList.remove('typing');
+        trim();
+        return;
+      }
+
       let charIdx = 0;
       const typeInterval = setInterval(() => {
         charIdx++;
-        msgEl.textContent = fullMsg.slice(0, charIdx);
-        if (charIdx >= fullMsg.length) { clearInterval(typeInterval); d.classList.remove('typing'); }
+        msgEl.textContent = msg.slice(0, charIdx);
+        if (charIdx >= msg.length) { clearInterval(typeInterval); d.classList.remove('typing'); }
       }, 18 + Math.random() * 22);
-
-      const allEntries = entriesEl.querySelectorAll('.syslog-entry');
-      if (allEntries.length > MAX_ENTRIES) {
-        const oldest = allEntries[allEntries.length - 1];
-        oldest.classList.add('fading');
-        setTimeout(() => { if (oldest.parentNode) oldest.remove(); }, 600);
-      }
+      trim();
     }
 
-    // Primary: local pre-rendered feed, refreshed hourly server-side with an
-    // authenticated token. The browser still makes a call on every visit, but
-    // never hits GitHub's 60/hr unauthenticated limit.
     async function loadFromJson() {
       const r = await fetch('./activity.json', { cache: 'no-store' });
       if (!r.ok) throw new Error('activity.json ' + r.status);
@@ -833,7 +839,6 @@
       return evts;
     }
 
-    // Fallback: live GitHub API (degrades gracefully if activity.json is missing/stale)
     async function loadFromApi() {
       const r = await fetch('https://api.github.com/users/indigokarasu/events?per_page=30');
       const evts = await r.json();
@@ -876,19 +881,22 @@
         const evt = allEvents[eventIndex % allEvents.length];
         typeEntry(evt);
         eventIndex++;
-        if (eventIndex >= allEvents.length) { eventIndex = 0; setTimeout(fetchEvents, 120000); }
+        if (eventIndex >= allEvents.length) {
+          eventIndex = 0;
+          setTimeout(fetchEvents, 120000);
+        }
       }
       setTimeout(cycle, 4000 + Math.random() * 4000);
     }
 
     if (await fetchEvents()) {
       isRunning = true;
-      for (let i = 0; i < Math.min(3, allEvents.length); i++) {
-        typeEntry(allEvents[i]);
-        eventIndex = i + 1;
-        await new Promise(r => setTimeout(r, 800));
-      }
-      setTimeout(cycle, 5000);
+      // Start FULL: render all existing activity immediately — never start blank.
+      const initial = allEvents.slice(0, MAX_ENTRIES);
+      for (const evt of initial) typeEntry(evt, true);
+      eventIndex = initial.length;
+      // Keep building with new entries.
+      setTimeout(cycle, 4000);
     }
   })();
   </script>
