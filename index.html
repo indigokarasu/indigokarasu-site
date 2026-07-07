@@ -781,7 +781,7 @@
 
   <script>
   // ============================================================
-  // GITHUB ACTIVITY FEED — perpetual loop with typing animation
+  // GITHUB ACTIVITY FEED — loads pre-rendered activity.json (refreshed hourly, server-side)
   // ============================================================
   (async function loadGitHubFeed() {
     const entriesEl = document.getElementById('syslog-entries');
@@ -793,30 +793,26 @@
 
     function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-    function typeEntry(evt, index) {
+    function typeEntry(evt) {
       const d = document.createElement('div');
       d.className = 'syslog-entry typing';
-      const t = new Date(evt.created_at);
-      const ts = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
-      const repoUrl = `https://github.com/${esc(evt.repo?.name || '?'})`;
-      const repoName = esc(evt.repo?.name?.replace('indigokarasu/','./') || '?');
-      d.innerHTML = `<span class="time">${ts}</span> <a class="repo" href="${repoUrl}" target="_blank" rel="noopener">${repoName}</a> <span class="msg"></span>`;
+      const t = new Date(evt.time);
+      const ts = isNaN(t.getTime()) ? '' : `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+      const repoUrl = evt.repoUrl || ('https://github.com/' + (evt.repo || '?'));
+      const repoName = esc((evt.repo || '?').replace('indigokarasu/','./'));
+      const msg = evt.msg || evt.type || '';
+      d.innerHTML = `<span class="time">${ts}</span> <a class="repo" href="${esc(repoUrl)}" target="_blank" rel="noopener">${repoName}</a> <span class="msg"></span>`;
       const msgEl = d.querySelector('.msg');
       entriesEl.prepend(d);
 
-      // Type the message character by character
-      const fullMsg = index !== undefined ? formatEvent(evt) : (evt._formatted || '');
+      const fullMsg = msg;
       let charIdx = 0;
       const typeInterval = setInterval(() => {
         charIdx++;
         msgEl.textContent = fullMsg.slice(0, charIdx);
-        if (charIdx >= fullMsg.length) {
-          clearInterval(typeInterval);
-          d.classList.remove('typing');
-        }
+        if (charIdx >= fullMsg.length) { clearInterval(typeInterval); d.classList.remove('typing'); }
       }, 18 + Math.random() * 22);
 
-      // Expire old entries: fade then remove
       const allEntries = entriesEl.querySelectorAll('.syslog-entry');
       if (allEntries.length > MAX_ENTRIES) {
         const oldest = allEntries[allEntries.length - 1];
@@ -825,67 +821,73 @@
       }
     }
 
-    function formatEvent(e) {
-      const map = {
-        PushEvent: x => `push → ${x.payload?.commits?.length||0} commit${(x.payload?.commits?.length||0)!==1?'s':''}${x.payload?.commits?.[0]?.message?' └ '+x.payload.commits[0].message.split('\n')[0]:''}`,
-        CreateEvent: x => `create ${x.payload?.ref_type||'ref'}${x.payload?.ref?': '+x.payload.ref:''}`,
-        IssuesEvent: x => `${x.payload?.action} issue #${x.payload?.issue?.number}`,
-        PullRequestEvent: x => `${x.payload?.action} PR #${x.payload?.pull_request?.number}`,
-        IssueCommentEvent: x => `comment on #${x.payload?.issue?.number}`,
-        WatchEvent: x => 'starred ★',
-        ForkEvent: x => 'forked ⑂',
-        ReleaseEvent: x => `released ${x.payload?.release?.tag_name||''}`,
-      };
-      return (map[e.type] && map[e.type](e)) || e.type;
+    // Primary: local pre-rendered feed, refreshed hourly server-side with an
+    // authenticated token. The browser still makes a call on every visit, but
+    // never hits GitHub's 60/hr unauthenticated limit.
+    async function loadFromJson() {
+      const r = await fetch('./activity.json', { cache: 'no-store' });
+      if (!r.ok) throw new Error('activity.json ' + r.status);
+      const data = await r.json();
+      const evts = Array.isArray(data) ? data : (data.events || []);
+      if (!Array.isArray(evts) || !evts.length) throw new Error('empty');
+      return evts;
+    }
+
+    // Fallback: live GitHub API (degrades gracefully if activity.json is missing/stale)
+    async function loadFromApi() {
+      const r = await fetch('https://api.github.com/users/indigokarasu/events?per_page=30');
+      const evts = await r.json();
+      if (!Array.isArray(evts)) throw new Error('rate limited');
+      return evts.map(e => ({
+        type: e.type,
+        time: e.created_at,
+        repo: (e.repo && e.repo.name) || '?',
+        repoUrl: 'https://github.com/' + ((e.repo && e.repo.name) || '?'),
+        msg: e.type
+      }));
     }
 
     async function fetchEvents() {
       try {
-        const evts = await fetch('https://api.github.com/users/indigokarasu/events?per_page=30').then(r => r.json());
-        if (!Array.isArray(evts)) throw new Error('rate limited');
-        statusEl.textContent = `✓ ${evts.length} events`;
+        allEvents = await loadFromJson();
+        statusEl.textContent = `✓ ${allEvents.length} events`;
         statusEl.style.color = 'var(--accent)';
-        // Pre-format all messages
-        allEvents = evts.filter(e => formatEvent(e)).map(e => { e._formatted = formatEvent(e); return e; });
         eventIndex = 0;
         return true;
-      } catch(e) {
-        statusEl.textContent = '✗ offline';
-        statusEl.style.color = '#f44';
-        return false;
+      } catch (e1) {
+        try {
+          allEvents = await loadFromApi();
+          statusEl.textContent = `✓ ${allEvents.length} (live)`;
+          statusEl.style.color = 'var(--accent)';
+          eventIndex = 0;
+          return true;
+        } catch (e2) {
+          statusEl.textContent = '✗ offline';
+          statusEl.style.color = '#f44';
+          return false;
+        }
       }
     }
 
     async function cycle() {
       if (!isRunning) return;
-      if (allEvents.length === 0) {
-        await fetchEvents();
-      }
+      if (allEvents.length === 0) await fetchEvents();
       if (allEvents.length > 0) {
         const evt = allEvents[eventIndex % allEvents.length];
         typeEntry(evt);
         eventIndex++;
-        // When we've gone through all events once, refresh
-        if (eventIndex >= allEvents.length) {
-          eventIndex = 0;
-          setTimeout(fetchEvents, 120000); // refresh every 2 min
-        }
+        if (eventIndex >= allEvents.length) { eventIndex = 0; setTimeout(fetchEvents, 120000); }
       }
-      // Next entry in 4-8 seconds
       setTimeout(cycle, 4000 + Math.random() * 4000);
     }
 
     if (await fetchEvents()) {
       isRunning = true;
-      // Start the loop with a staggered first few entries
       for (let i = 0; i < Math.min(3, allEvents.length); i++) {
-        const evt = allEvents[i];
-        typeEntry(evt, i);
+        typeEntry(allEvents[i]);
         eventIndex = i + 1;
-        // Brief delay between initial entries
         await new Promise(r => setTimeout(r, 800));
       }
-      // Continue the perpetual loop
       setTimeout(cycle, 5000);
     }
   })();
