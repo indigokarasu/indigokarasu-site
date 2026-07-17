@@ -1,24 +1,14 @@
-# indigokarasu.com
+# indigokarasu-site
 
-Source for [indigokarasu.com](https://indigokarasu.com).
+<p align="center">
+<img src="./assets/readme/hero.svg" width="100%" alt="Source for indigokarasu.com">
+</p>
 
-Static HTML/CSS site. No build step, no dependencies, no frameworks.
+indigokarasu-site — Source for indigokarasu.com
 
-## Structure
 
-```
-index.html          # Homepage
-style.css           # All styles
-essays/
-  invisible-infrastructure.html
-  tools-should-disappear.html
-  owning-your-stack.html
-```
+> One clear job, done well.
 
-## Deploy
+---
 
-```bash
-bash deploy.sh
-```
-
-Deploys to DreamHost via SFTP.
+*indigokarasu-site is part of the [OCAS Agent Suite](https://github.com/indigokarasu).*
