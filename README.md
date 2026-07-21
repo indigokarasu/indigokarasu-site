@@ -1,14 +1,11 @@
 # indigokarasu-site
 
 <p align="center">
-<img src="./assets/readme/hero.jpg" width="100%" alt="Source for indigokarasu.com">
+  <img src="./assets/readme/hero.jpg" width="100%" alt="Source for indigokarasu.com">
 </p>
 
-indigokarasu-site — Source for indigokarasu.com
+Source for the public-facing site indigokarasu.com.
 
-
-> One clear job, done well.
-
----
-
-*indigokarasu-site is part of the [OCAS Agent Suite](https://github.com/indigokarasu).*
+**Contents:**
+- Static site source
+- Published via DreamHost
