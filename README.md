@@ -9,3 +9,7 @@ Source for the public-facing site indigokarasu.com.
 **Contents:**
 - Static site source
 - Published via DreamHost
+
+---
+## 📄 License
+MIT License — see `LICENSE` for details.
