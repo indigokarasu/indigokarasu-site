@@ -1,7 +1,7 @@
 # indigokarasu-site
 
 <p align="center">
-<img src="./assets/readme/hero.svg" width="100%" alt="Source for indigokarasu.com">
+<img src="./assets/readme/hero.jpg" width="100%" alt="Source for indigokarasu.com">
 </p>
 
 indigokarasu-site — Source for indigokarasu.com
