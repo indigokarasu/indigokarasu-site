@@ -27,8 +27,8 @@ import urllib.request
 
 USER = "indigokarasu"
 API = "https://api.github.com"
-MAX_EVENTS = 30
-MAX_LOOKUPS = 20  # per run; the rest are filled in on later runs
+MAX_EVENTS = 100
+MAX_LOOKUPS = 40  # per run; the rest are filled in on later runs
 
 HIDE = None  # compiled from --hide
 
@@ -199,9 +199,13 @@ def fmt(e, repo, look):
 
 def build(look):
     repos = public_repos()
-    events = get(f"/users/{USER}/events/public?per_page=100")
-    kept = [e for e in events
-            if e.get("public") is True and (e.get("repo") or {}).get("name") in repos]
+    kept = []
+    for page in (1, 2, 3):  # GitHub keeps at most 300 recent events
+        batch = get(f"/users/{USER}/events/public?per_page=100&page={page}")
+        kept += [e for e in batch
+                 if e.get("public") is True and (e.get("repo") or {}).get("name") in repos]
+        if len(batch) < 100 or len(kept) >= MAX_EVENTS:
+            break
     kept.sort(key=lambda e: e.get("created_at") or "", reverse=True)
     out = []
     for e in kept[:MAX_EVENTS]:

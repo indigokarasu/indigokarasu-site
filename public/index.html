@@ -466,6 +466,7 @@
     color: var(--text-dim);
     border-bottom: 1px solid rgba(255,255,255,0.03);
     padding: 0.3rem 0;
+    height: calc(1.6em + 0.6rem + 1px);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .syslog-entry .time { color: var(--text-dim); opacity: 0.5; margin-right: 0.5rem; }
@@ -808,13 +809,15 @@
   </script>
 
   <script>
-  // recent public GitHub activity from activity.json, rebuilt hourly
+  // recent public GitHub activity from activity.json, rebuilt hourly;
+  // the panel shows as many rows as fit its height
   (function () {
     const list = document.getElementById('syslog-entries');
     const status = document.getElementById('syslog-status');
-    const MAX_ENTRIES = 12;
     const seen = new Set();
+    let events = [];   // newest first
     let busy = false;
+    let rowHeight = 0;
 
     const pad = n => String(n).padStart(2, '0');
     const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -826,22 +829,48 @@
       return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
 
-    function trim() {
-      const rows = list.querySelectorAll('.syslog-entry:not(.fading)');
-      for (let i = MAX_ENTRIES; i < rows.length; i++) {
-        const row = rows[i];
-        row.classList.add('fading');
-        setTimeout(() => row.remove(), REDUCED_MOTION ? 0 : 600);
-      }
-    }
-
-    // insert in time order; only a row that lands on top is typed out
-    function add(evt, animate) {
+    function makeRow(evt) {
       const row = document.createElement('div');
       row.className = 'syslog-entry';
       row.dataset.time = evt.time;
       const url = /^https:\/\/github\.com\//.test(evt.repoUrl) ? evt.repoUrl : 'https://github.com/' + evt.repo;
       row.innerHTML = `<time class="time" datetime="${esc(evt.time)}">${stamp(evt.time)}</time> <a class="repo" href="${esc(url)}" target="_blank" rel="noopener">${esc(evt.repo.replace('indigokarasu/', './'))}</a> <span class="msg"></span>`;
+      return row;
+    }
+
+    function capacity() {
+      if (!rowHeight) {
+        const probe = makeRow({ time: '', repo: 'x', repoUrl: '', msg: '' });
+        probe.querySelector('.msg').textContent = 'x';
+        probe.style.visibility = 'hidden';
+        list.appendChild(probe);
+        rowHeight = probe.getBoundingClientRect().height;
+        probe.remove();
+      }
+      return Math.max(1, Math.floor(list.clientHeight / (rowHeight || 27)));
+    }
+
+    const overflows = row => row.getBoundingClientRect().bottom > list.getBoundingClientRect().bottom + 0.5;
+
+    function render() {
+      list.replaceChildren(...events.slice(0, capacity() + 1).map(evt => {
+        const row = makeRow(evt);
+        row.querySelector('.msg').textContent = evt.msg;
+        return row;
+      }));
+      while (list.lastElementChild && overflows(list.lastElementChild)) list.lastElementChild.remove();
+    }
+
+    function trim() {
+      Array.from(list.querySelectorAll('.syslog-entry:not(.fading)')).filter(overflows).forEach(row => {
+        row.classList.add('fading');
+        setTimeout(() => row.remove(), REDUCED_MOTION ? 0 : 600);
+      });
+    }
+
+    // insert in time order; only a row that lands on top is typed out
+    function add(evt, animate) {
+      const row = makeRow(evt);
       const msg = row.querySelector('.msg');
       const after = Array.from(list.children).find(r => (r.dataset.time || '') < evt.time);
       list.insertBefore(row, after || null);
@@ -882,15 +911,15 @@
       if (busy) return;
       busy = true;
       try {
-        const events = await load();
+        const latest = await load();
+        const fresh = latest.filter(e => !seen.has(e.id)).reverse();
+        events = latest;
+        latest.forEach(e => seen.add(e.id));
         if (first || !list.children.length) {
-          events.slice(0, MAX_ENTRIES).reverse().forEach(e => add(e, false));
-          events.forEach(e => seen.add(e.id));
+          render();
           return;
         }
-        const fresh = events.filter(e => !seen.has(e.id)).reverse();
         for (const e of fresh) {
-          seen.add(e.id);
           await add(e, true);
           await sleep(1200);
         }
@@ -903,6 +932,16 @@
         busy = false;
       }
     }
+
+    // re-fit when the window changes size
+    let resizeTimer;
+    addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function refit() {
+        if (busy) { resizeTimer = setTimeout(refit, 500); return; }
+        if (events.length) render();
+      }, 200);
+    });
 
     refresh(true);
     setInterval(() => refresh(false), 5 * 60 * 1000);
