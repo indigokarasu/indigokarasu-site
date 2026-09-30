@@ -551,11 +551,29 @@
   const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const GLITCH_CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`ÄÖÜßØÆÐŁ';
 
-  // one location lookup per visit, used by the palette and the visitor details
-  const geoLookup = fetch('https://ipapi.co/json/')
-    .then(r => (r.ok ? r.json() : null))
-    .then(g => (g && !g.error && g.latitude != null ? g : null))
-    .catch(() => null);
+  // one location lookup per visit, used by the palette and the visitor details;
+  // ipinfo.io is the fallback when ipapi.co is rate limited
+  const geoLookup = (async () => {
+    const sources = [
+      ['https://ipapi.co/json/', g => g],
+      ['https://ipinfo.io/json', g => {
+        const [lat, lon] = String(g.loc || '').split(',').map(Number);
+        return { ip: g.ip, city: g.city, region: g.region, postal: g.postal,
+                 country_name: g.country, org: g.org, latitude: lat, longitude: lon };
+      }],
+    ];
+    for (const [url, normalise] of sources) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) continue;
+        const g = normalise(await r.json());
+        if (g && !g.error && Number.isFinite(g.latitude) && Number.isFinite(g.longitude)) return g;
+      } catch (e) {
+        // try the next source
+      }
+    }
+    return null;
+  })();
 
   function realText(el) {
     if (el.__text == null) el.__text = (el.dataset.text || el.textContent).trim();
