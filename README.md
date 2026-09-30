@@ -7,9 +7,17 @@
 Source for the public-facing site indigokarasu.com.
 
 **Contents:**
-- Static site source
-- Published via DreamHost
+- `public/`: the site as served (one static page, favicon, share image, robots.txt, sitemap)
+- `build-activity.py`: builds `public/activity.json`, the recent public GitHub activity shown on the page
+- Published via DreamHost; the activity feed is rebuilt hourly
+
+To preview locally:
+
+```sh
+python3 build-activity.py --out public/activity.json
+python3 -m http.server --directory public
+```
 
 ---
 ## 📄 License
-MIT License — see `LICENSE` for details.
+MIT License - see `LICENSE` for details.
