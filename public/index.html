@@ -258,14 +258,21 @@
   }
 
   /* dot grid and grain behind the page */
+  :root { --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E"); }
   #gen-substrate {
     position: fixed; inset: 0; width: 100%; height: 100%;
     z-index: 0; pointer-events: none; opacity: 0.15; mix-blend-mode: screen;
     background-color: transparent;
     background-image:
       radial-gradient(circle at center, var(--accent) 1.1px, transparent 1.5px),
-      url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+      var(--grain);
     background-size: 26px 26px, 256px 256px;
+  }
+  /* with a mouse the dots are drawn on #net instead */
+  #gen-substrate.net-on { background-image: var(--grain); background-size: 256px 256px; }
+  #net {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    z-index: -1; pointer-events: none; mix-blend-mode: screen;
   }
 
   /* buttons */
@@ -638,6 +645,7 @@
     const la = luminance(accent), lb = luminance(bg);
     root.setProperty('--on-accent', 1.05 / (la + 0.05) >= (la + 0.05) / (lb + 0.05) ? '#fff' : bg);
     document.querySelector('meta[name="theme-color"]').setAttribute('content', accent);
+    dispatchEvent(new Event('palettechange'));
   }
 
   // palette follows the visitor's current weather
@@ -898,6 +906,141 @@
 
     refresh(true);
     setInterval(() => refresh(false), 5 * 60 * 1000);
+  })();
+  </script>
+
+  <script>
+  // the dot grid gathers toward the cursor like a net and springs back when
+  // it moves away; touch screens and reduced motion keep the plain CSS dots
+  (function () {
+    if (REDUCED_MOTION || !matchMedia('(pointer: fine)').matches) return;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    canvas.id = 'net';
+    canvas.setAttribute('aria-hidden', 'true');
+    document.body.prepend(canvas);
+    document.getElementById('gen-substrate').classList.add('net-on');
+
+    const GAP = 26, OFFSET = 13, DOT = 1.25;
+    const REACH = 260;        // radius of the pull, px
+    const PULL = 0.42;        // share of its distance a point moves toward the cursor
+    const SPRING = 0.14, DAMP = 0.78;
+    const BASE = 0.15, LIFT = 0.35, LEVELS = 6;
+
+    let w = 0, h = 0, dpr = 1, cols = 0, rows = 0;
+    let pts = new Float32Array(0);   // per point: rest x, rest y, x, y, vx, vy
+    let mouse = null, raf = 0, accent = '#7b61ff';
+
+    function readAccent() {
+      accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || accent;
+    }
+
+    function build() {
+      dpr = Math.min(devicePixelRatio || 1, 2);
+      w = innerWidth;
+      h = innerHeight;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      // one extra ring outside the viewport so the edges fill in when pulled
+      cols = Math.ceil(w / GAP) + 2;
+      rows = Math.ceil(h / GAP) + 2;
+      pts = new Float32Array(cols * rows * 6);
+      for (let j = 0; j < rows; j++) {
+        for (let i = 0; i < cols; i++) {
+          const k = (j * cols + i) * 6;
+          pts[k] = pts[k + 2] = OFFSET + (i - 1) * GAP;
+          pts[k + 1] = pts[k + 3] = OFFSET + (j - 1) * GAP;
+        }
+      }
+      draw();
+    }
+
+    function step() {
+      const r2 = REACH * REACH;
+      let moving = false;
+      for (let k = 0; k < pts.length; k += 6) {
+        let tx = pts[k], ty = pts[k + 1];
+        if (mouse) {
+          const dx = mouse.x - tx, dy = mouse.y - ty, d2 = dx * dx + dy * dy;
+          if (d2 < r2) {
+            const f = 1 - d2 / r2;
+            tx += dx * PULL * f * f;
+            ty += dy * PULL * f * f;
+          }
+        }
+        const vx = (pts[k + 4] + (tx - pts[k + 2]) * SPRING) * DAMP;
+        const vy = (pts[k + 5] + (ty - pts[k + 3]) * SPRING) * DAMP;
+        pts[k + 2] += vx;
+        pts[k + 3] += vy;
+        pts[k + 4] = vx;
+        pts[k + 5] = vy;
+        if (!moving && (Math.abs(vx) + Math.abs(vy) > 0.02 ||
+                        Math.abs(tx - pts[k + 2]) + Math.abs(ty - pts[k + 3]) > 0.05)) moving = true;
+      }
+      return moving;
+    }
+
+    // 0..1, how far a point sits from its rest position
+    function pulled(k) {
+      const dx = pts[k + 2] - pts[k], dy = pts[k + 3] - pts[k + 1];
+      return Math.min(1, Math.sqrt(dx * dx + dy * dy) / 24);
+    }
+
+    function draw() {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = ctx.strokeStyle = accent;
+      ctx.lineWidth = 0.6;
+      const dots = Array.from({ length: LEVELS + 1 }, () => new Path2D());
+      const threads = Array.from({ length: LEVELS }, () => new Path2D());
+      const thread = (k, n, p) => {
+        const q = Math.max(p, pulled(n));
+        if (q < 0.08) return;
+        const path = threads[Math.min(LEVELS - 1, Math.floor(q * LEVELS))];
+        path.moveTo(pts[k + 2], pts[k + 3]);
+        path.lineTo(pts[n + 2], pts[n + 3]);
+      };
+      for (let j = 0; j < rows; j++) {
+        for (let i = 0; i < cols; i++) {
+          const k = (j * cols + i) * 6, x = pts[k + 2], y = pts[k + 3], p = pulled(k);
+          const dot = dots[Math.round(p * LEVELS)];
+          dot.moveTo(x + DOT, y);
+          dot.arc(x, y, DOT, 0, Math.PI * 2);
+          if (i + 1 < cols) thread(k, k + 6, p);
+          if (j + 1 < rows) thread(k, k + cols * 6, p);
+        }
+      }
+      threads.forEach((path, l) => { ctx.globalAlpha = 0.5 * LIFT * (l + 1) / LEVELS; ctx.stroke(path); });
+      dots.forEach((path, l) => { ctx.globalAlpha = BASE + LIFT * l / LEVELS; ctx.fill(path); });
+      ctx.globalAlpha = 1;
+    }
+
+    function frame() {
+      raf = 0;
+      const moving = step();
+      draw();
+      if (moving) raf = requestAnimationFrame(frame);
+    }
+    const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
+    const release = () => { mouse = null; kick(); };
+
+    addEventListener('pointermove', e => {
+      if (e.pointerType === 'touch') return;
+      mouse = { x: e.clientX, y: e.clientY };
+      kick();
+    }, { passive: true });
+    document.documentElement.addEventListener('mouseleave', release);
+    addEventListener('blur', release);
+    addEventListener('palettechange', () => { readAccent(); draw(); });
+    let resizeTimer;
+    addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(build, 150);
+    });
+
+    readAccent();
+    build();
   })();
   </script>
 
