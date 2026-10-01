@@ -266,7 +266,7 @@
     background-image:
       radial-gradient(circle at center, var(--accent) 1.1px, transparent 1.5px),
       var(--grain);
-    background-size: 26px 26px, 256px 256px;
+    background-size: 40px 40px, 256px 256px;
   }
   /* with a mouse the dots are drawn on #net instead */
   #gen-substrate.net-on { background-image: var(--grain); background-size: 256px 256px; }
@@ -274,7 +274,7 @@
     position: fixed; inset: 0; width: 100%; height: 100%;
     z-index: -1; pointer-events: none; mix-blend-mode: screen;
     /* faint red/cyan split everywhere; the script adds a stronger one where the net is pulled */
-    filter: drop-shadow(-0.6px 0 rgba(255,0,0,0.45)) drop-shadow(0.6px 0 rgba(0,255,255,0.45));
+    filter: drop-shadow(-0.6px 0 rgba(255,0,0,0.3)) drop-shadow(0.6px 0 rgba(0,255,255,0.3));
   }
 
   /* buttons */
@@ -982,15 +982,17 @@
     document.body.prepend(canvas);
     document.getElementById('gen-substrate').classList.add('net-on');
 
-    const GAP = 26, OFFSET = 13, DOT = 1.25, EDGE = 4;
+    const GAP = 40, OFFSET = 20, DOT = 1.25, EDGE = 3;
     const REACH = 1000;       // radius of the pull, px; falls off gently out to here
     const PULL = 0.2;         // share of its distance a point moves toward the cursor
     const SPRING = 0.14, DAMP = 0.78;
-    const BASE = 0.15, LIFT = 0.35, LEVELS = 6;
+    const BASE = 0.1, LIFT = 0.22, LEVELS = 6;
     // red/cyan split like the text glitch, wider where the net is pulled or
     // moving (the faint split everywhere else is a CSS filter on the canvas)
     const SPLIT_BASE = 0.6, SPLIT_PULL = 3, SPLIT_SPEED = 0.6, SPLIT_MAX = 5;
-    const FRINGE_LIFT = 0.35;
+    const FRINGE_LIFT = 0.22;
+    // a click sends a ring outward that shoves the net as it passes
+    const RIPPLE_SPEED = 900, RIPPLE_BAND = 60, RIPPLE_PUSH = 3.2, RIPPLE_LIFE = 1600;
 
     let w = 0, h = 0, dpr = 1, cols = 0, rows = 0;
     let pts = new Float32Array(0);   // per point: rest x, rest y, x, y, vx, vy
@@ -999,6 +1001,7 @@
     // drops a step when frames run slow: 2 = everything, 1 = no fringed
     // threads and 1x resolution, 0 = dots only
     let quality = 2, slowFrames = 0, lastFrameAt = 0;
+    let ripples = [];
 
     function readAccent() {
       accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || accent;
@@ -1032,8 +1035,12 @@
 
     function step() {
       const r2 = REACH * REACH;
-      let moving = false;
+      const now = performance.now();
+      ripples = ripples.filter(r => now - r.t0 < RIPPLE_LIFE);
+      const waves = ripples.map(r => ({ x: r.x, y: r.y, front: RIPPLE_SPEED * (now - r.t0) / 1000, fade: 1 - (now - r.t0) / RIPPLE_LIFE }));
+      let moving = waves.length > 0;
       for (let k = 0; k < pts.length; k += 6) {
+        let ring = 0;
         let tx = pts[k], ty = pts[k + 1], strength = 0;
         if (mouse) {
           const dx = mouse.x - tx, dy = mouse.y - ty, d2 = dx * dx + dy * dy;
@@ -1045,12 +1052,24 @@
             strength = u * u * u;
           }
         }
-        // how strongly this point is held, eased so it fades after the cursor leaves
+        // ripple fronts push outward and light the net up as they pass
+        let kx = 0, ky = 0;
+        for (const wv of waves) {
+          const dx = pts[k] - wv.x, dy = pts[k + 1] - wv.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+          const off = (d - wv.front) / RIPPLE_BAND;
+          if (off < -3 || off > 3) continue;
+          const wgt = Math.exp(-off * off) * wv.fade;
+          kx += dx / d * RIPPLE_PUSH * wgt;
+          ky += dy / d * RIPPLE_PUSH * wgt;
+          ring = Math.max(ring, wgt);
+        }
+        strength = Math.min(1, strength + ring);
+        // how strongly this point is lit: quick to rise, eased on the way down
         const i = k / 6;
-        pull[i] += (strength - pull[i]) * 0.15;
+        pull[i] += (strength - pull[i]) * (strength > pull[i] ? 0.5 : 0.15);
         if (Math.abs(strength - pull[i]) > 0.003) moving = true;
-        const vx = (pts[k + 4] + (tx - pts[k + 2]) * SPRING) * DAMP;
-        const vy = (pts[k + 5] + (ty - pts[k + 3]) * SPRING) * DAMP;
+        const vx = (pts[k + 4] + (tx - pts[k + 2]) * SPRING + kx) * DAMP;
+        const vy = (pts[k + 5] + (ty - pts[k + 3]) * SPRING + ky) * DAMP;
         pts[k + 2] += vx;
         pts[k + 3] += vy;
         pts[k + 4] = vx;
@@ -1147,6 +1166,12 @@
     addEventListener('pointermove', e => {
       if (e.pointerType === 'touch') return;
       mouse = { x: e.clientX, y: e.clientY };
+      kick();
+    }, { passive: true });
+    addEventListener('pointerdown', e => {
+      if (e.pointerType === 'touch' || e.button !== 0) return;
+      ripples.push({ x: e.clientX, y: e.clientY, t0: performance.now() });
+      if (ripples.length > 4) ripples.shift();
       kick();
     }, { passive: true });
     document.documentElement.addEventListener('mouseleave', release);
