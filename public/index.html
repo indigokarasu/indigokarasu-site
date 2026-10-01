@@ -810,13 +810,16 @@
 
   <script>
   // recent public GitHub activity from activity.json, rebuilt hourly;
-  // the panel shows as many rows as fit its height
+  // the panel shows as many rows as fit its height. The newest few are held
+  // back at load and typed in over the first half minute.
   (function () {
     const list = document.getElementById('syslog-entries');
     const status = document.getElementById('syslog-status');
+    const HELD = 10, REVEAL_MS = 30000;
     const seen = new Set();
+    const pending = new Set();   // held back, not shown yet
     let events = [];   // newest first
-    let busy = false;
+    let busy = false, revealing = false;
     let rowHeight = 0;
 
     const pad = n => String(n).padStart(2, '0');
@@ -853,7 +856,7 @@
     const overflows = row => row.getBoundingClientRect().bottom > list.getBoundingClientRect().bottom + 0.5;
 
     function render() {
-      list.replaceChildren(...events.slice(0, capacity() + 1).map(evt => {
+      list.replaceChildren(...events.filter(e => !pending.has(e.id)).slice(0, capacity() + 1).map(evt => {
         const row = makeRow(evt);
         row.querySelector('.msg').textContent = evt.msg;
         return row;
@@ -907,8 +910,21 @@
         .sort((a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0));
     }
 
+    async function reveal(held) {
+      revealing = true;
+      const start = performance.now();
+      const step = (REVEAL_MS - 1500) / held.length;
+      for (let i = 0; i < held.length; i++) {
+        const due = start + 1500 + i * step + (Math.random() - 0.5) * step * 0.5;
+        await sleep(Math.max(0, due - performance.now()));
+        pending.delete(held[i].id);
+        await add(held[i], true);
+      }
+      revealing = false;
+    }
+
     async function refresh(first) {
-      if (busy) return;
+      if (busy || revealing) return;
       busy = true;
       try {
         const latest = await load();
@@ -916,7 +932,10 @@
         events = latest;
         latest.forEach(e => seen.add(e.id));
         if (first || !list.children.length) {
+          const held = latest.slice(0, HELD).reverse();   // oldest of them first
+          held.forEach(e => pending.add(e.id));
           render();
+          reveal(held);
           return;
         }
         for (const e of fresh) {
@@ -938,7 +957,7 @@
     addEventListener('resize', () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(function refit() {
-        if (busy) { resizeTimer = setTimeout(refit, 500); return; }
+        if (busy || list.querySelector('.typing')) { resizeTimer = setTimeout(refit, 500); return; }
         if (events.length) render();
       }, 200);
     });
